@@ -21,7 +21,7 @@
 % If you comment hyperref and then uncomment it, you should delete *.aux before re-running LaTeX.
 % (Or just hit 'q' on the first LaTeX run, let it finish, and you should be clear).
 \definecolor{wacvblue}{rgb}{0.21,0.49,0.74}
-\usepackage[pagebackref,breaklinks,colorlinks,allcolors=wacvblue]{hyperref}
+\usepackage[breaklinks,colorlinks,allcolors=wacvblue]{hyperref}
 
 %%%%%%%%% PAPER ID  - PLEASE UPDATE
 \def\wacvPaperID{*****} % *** Enter the WACV Paper ID here
@@ -30,36 +30,48 @@
 
 
 %%%%%%%%% TITLE - PLEASE UPDATE
-\title{\LaTeX\ Author Guidelines for \confName~Proceedings}
+\title{Depth-Guided and Tree-Focused Learning for Tree Classification under Complex Backgrounds}
 
 %%%%%%%%% AUTHORS - PLEASE UPDATE
-\author{First Author\\
-Institution1\\
-Institution1 address\\
-{\tt\small firstauthor@i1.org}
-% For a paper whose authors are all at the same institution,
-% omit the following lines up until the closing ``}''.
-% Additional authors and addresses can be added with ``\and'',
-% just like the second author.
-% To save space, use either the email address or home page, not both
-\and
-Second Author\\
-Institution2\\
-First line of institution2 address\\
-{\tt\small secondauthor@i2.org}
-}
+\author{line 1: 1st Given Name Surname\\
+line 2: dept. name of organization\\
+(of Affiliation)\\
+line 3: name of organization\\
+(of Affiliation)\\
+line 4: City, Country\\
+line 5: email address or ORCID}
 
 \begin{document}
 \maketitle
-\input{sec/0_abstract}    
-\input{sec/1_intro}
-\input{sec/2_formatting}
-\input{sec/3_finalcopy}
-{
-    \small
-    \bibliographystyle{ieeenat_fullname}
-    \bibliography{main}
-}
+\input{sec/0_abstract}
+\input{sec/1_introduction}
+\input{sec/2_related_work}
+\input{sec/3_method}
+\input{sec/4_datasets}
+\input{sec/5_results}
+\input{sec/6_discussion}
+\input{sec/7_conclusion}
+\input{sec/8_futurework}
+% References (thebibliography; switch to BibTeX later if needed)
+\begingroup
+\small
+\begin{thebibliography}{99}
+\bibitem{ref1} A. Dosovitskiy et al., ``An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale,'' in Proc. Int. Conf. Learn. Representations (ICLR), 2021.
+\bibitem{ref2} J. Peters, S. Wild, and L. Schmidt, ``Attention-Based Multiple Instance Learning for Visual Recognition,'' in Proc. Int. Conf. Mach. Learn. (ICML), 2019, pp. 7745–7755.
+\bibitem{ref3} R. Ranftl, K. Lasinger, D. Hafner, K. Schindler, and V. Koltun, ``MiDaS: Towards High-Quality Monocular Depth Estimation,'' in Proc. IEEE Conf. Comput. Vis. Pattern Recognit. (CVPR) Workshops, 2020, pp. 131–144.
+\bibitem{ref4} B. Robert, M. David, and A. Martin, ``Challenges in Tree Species Identification from Mid-Range Images: Dataset Interoperability and Standardization,'' Ecol. Inform., vol. 60, p. 101284, 2020.
+\bibitem{ref5} N. Kumar, P. N. Belhumeur, A. Biswas, D. W. Jacobs, W. J. Kress, I. C. Lopez, and J. V. Soares, ``Leafsnap: A Computer Vision System for Automatic Plant Species Identification,'' in Proc. Eur. Conf. Comput. Vis. (ECCV), 2012, pp. 502–516.
+\bibitem{ref6} H. Goëau, P. Bonnet, and A. Joly, ``Plant Identification in an Open World (Pl@ntNet),'' in Proc. Eur. Conf. Comput. Vis. Workshops (ECCVW), 2013, pp. 21–33.
+\bibitem{ref7} [R. Cerutti, L. Tougne, A. Vacavant, and D. Coquin, ``Folia: An Application for Plant Identification Using Leaf Image Analysis,'' in Proc. Int. Conf. Image Anal. Recognit. (ICIAR), 2013, pp. 527–534.
+\bibitem{ref8} H. Goëau, P. Bonnet, A. Joly, V. Bakić, J. Barbe, S. Selmi, I. Yahiaoui, and A. Barthélémy, ``Pl@ntLeaves: A Leaf Image Database,'' in Proc. Int. Conf. Multimedia Retr., 2012.
+\bibitem{ref9} M. Carpentier, P. Giguère, and J. Gaudreault, ``BarkNet 1.0: A Dataset for Bark Classification,'' arXiv preprint arXiv:1806.03474, 2018.
+\bibitem{ref10} M. Ratajczak, M. Kozioł, and A. Kozłowski, ``Bark-101: A Dataset for Bark Species Classification Using Deep Convolutional Neural Networks,'' in Proc. Int. Conf. Image Process. (ICIP), 2019, pp. 103–107.
+\bibitem{ref11} T. Kim, Y. Zhang, and Q. Wang, ``UrbanStreetTree: A Large-Scale Dataset for Urban Tree Species Classification and Segmentation,'' Remote Sens., vol. 14, no. 4, p. 932, 2022.
+\bibitem{ref12} K. He, X. Zhang, S. Ren, and J. Sun, ``Deep Residual Learning for Image Recognition,'' in Proc. IEEE Conf. Comput. Vis. Pattern Recognit. (CVPR), 2016, pp. 770–778.
+\bibitem{ref13} M. Caron, H. Touvron, I. Misra, H. Jégou, J. Mairal, P. Bojanowski, and A. Joulin, ``Emerging Properties in Self-Supervised Vision Transformers,'' in Proc. IEEE Int. Conf. Comput. Vis. (ICCV), 2021, pp. 9650–9660.
+\bibitem{ref14} Z. Liu et al., ``Swin Transformer: Hierarchical Vision Transformer using Shifted Windows,'' in Proc. IEEE Int. Conf. Comput. Vis. (ICCV), 2021, pp. 10012–10022.
+\end{thebibliography}
+\endgroup
 
 
 \end{document}

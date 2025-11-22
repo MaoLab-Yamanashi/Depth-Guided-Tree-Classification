@@ -1,0 +1,6 @@
+\section{Conclusion}
+
+In this study, we verified the effectiveness of integrating depth information into Transformer-based models for tree image classification, focusing on foreground enhancement and background suppression. Experimental results demonstrated that depth-guided approaches consistently outperformed ResNet \cite{ref12} and standard ViT models \cite{ref1}. In particular, the Depth-guided Attention structure exhibited stable and consistent performance as an architectural extension. These findings suggest that depth information is highly compatible with the self-attention mechanism of Transformers and serves as an effective auxiliary signal for extracting key structures under varying background conditions.
+
+Conversely, simple additive fusion methods—such as Late Fusion and Piecewise Depth processing—tended to destabilize attention due to disrupted scale consistency of depth features. This indicates that effective integration of depth information requires not a static arithmetic combination, but rather a context-aware and dynamically optimized design that adapts to feature distribution.
+

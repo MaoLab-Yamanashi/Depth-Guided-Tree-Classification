@@ -9,6 +9,42 @@ line 3: name of organization
 (of Affiliation)
 line 4: City, Country
 line 5: email address or ORCID
+line 1: 4th Given Name Surname
+line 2: dept. name of organization
+(of Affiliation)
+line 3: name of organization 
+(of Affiliation)
+line 4: City, Country
+line 5: email address  or ORCID 
+line 1: 2nd Given Name Surname
+line 2: dept. name of organization 
+(of Affiliation)
+line 3: name of organization 
+(of Affiliation)
+line 4: City, Country
+line 5: email address or ORCID
+line 1: 5th Given Name Surname
+line 2: dept. name of organization 
+(of Affiliation)
+line 3: name of organization 
+(of Affiliation)
+line 4: City, Country
+line 5: email address  or ORCID 
+line 1: 3rd Given Name Surname
+line 2: dept. name of organization 
+(of Affiliation)
+line 3: name of organization 
+(of Affiliation)
+line 4: City, Country
+line 5: email address or ORCID
+line 1: 6th Given Name Surname
+line 2: dept. name of organization 
+(of Affiliation)
+line 3: name of organization 
+(of Affiliation)
+line 4: City, Country
+line 5: email address or ORCID 
+ 
  
  
 Abstract—Tree classification in urban and orchard environments plays an important role in landscape management, agricultural support, and environmental monitoring. However, tree images captured from mid-range distances often include extensive background regions, leading models to overfit contextual information rather than intrinsic features such as trunks and branches. In this study, we propose a trunk-focused learning framework that integrates the ViT with ABMIL. Furthermore, we introduce Depth-guided Attention and Depth-guided Augmentation, which incorporate depth maps estimated by the MiDaS model into both data augmentation and attention computation stages to guide the model’s focus toward foreground structures such as trunks and branches. Comparative experiments were conducted on 16 configurations using the FruitsPark dataset collected at Fuefuki Fruits Park, Yamanashi Prefecture, Japan, and the UrbanStreetTree dataset containing urban street tree images from China. The proposed depth-guided methods significantly outperformed conventional CNN and ViT models, achieving accuracies of up to 97.9% on UrbanStreetTree dataset and 95.2% on FruitsPark dataset. Visualization of attention maps further confirmed stable focus on trunk and branch regions facilitated by depth information, suggesting that depth signals serve as an effective auxiliary cue for suppressing background dependency.
@@ -153,8 +189,6 @@ After normalization, the attention A_i and depth weight g_i are blended via geom
 █(A ̂_i=(A_i^(" " 1-λ) " " g_i^(" " λ))/(∑_j▒〖A_j^(" " 1-λ) " " g_j^(" " λ) 〗)#(13) )
 
 where λ controls the contribution of depth. This formulation preserves the learned attention structure while enhancing emphasis on near-field trunk regions.
-DINO-pretrained ViT for Enhanced Representation
-To further improve representational power for bark and branch textures, the DINO-pretrained ViT (self-supervised on ImageNet) [13] is employed. The representations acquired through DINO capture structural correlations independent of class labels, providing robust feature embeddings that generalize well even to natural images.
 Datasets
 This section describes the datasets employed in this study and the augmentation methods applied during training. Two datasets were used: one collected independently in Japan (FruitsPark) and a publicly available urban tree dataset (UrbanStreetTree).
 FruitsPark Dataset

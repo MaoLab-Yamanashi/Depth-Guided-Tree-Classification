@@ -1,0 +1,99 @@
+\section{Results}
+
+\subsection{Models and Comparative Methods}
+This study evaluated the effectiveness of depth guidance in image classification, focusing primarily on Transformer-based models. The base models used were ResNet18 \cite{ref12}, ViT \cite{ref1}, and Swin Transformer \cite{ref14}. For ViT, we additionally employed a self-supervised pretraining model, DINO-pretrained ViT \cite{ref13}, initialized with weights pretrained on ImageNet-1K. Comparative methods included 16 configurations in total: ResNet18 (Global Average Pooling / MIL), ViT and ViT(DINO) (Global Average Pooling / MIL / Depth-guided Augmentation / Depth-guided Attention / Late Fusion / Piecewise Depth), and Swin Transformer + MIL.
+
+\subsection{Evaluation Metrics}
+The classification performance of each model was evaluated using accuracy (Accuracy) and micro-averaged F1 score (Micro-F1) on the test datasets. If no separate test set was available, the validation dataset was used instead. Additionally, attention maps were visualized to qualitatively analyze how depth guidance influenced attention distributions. 
+
+Accuracy was calculated as the ratio of correctly classified samples to the total number of samples, defined as:
+\begin{equation}\tag{14}
+\mathrm{Accuracy}=\frac{1}{N}\sum_{i=1}^{N}\mathbf{1}(\hat{y}_i=y_i)
+\end{equation}
+where $N$ is the total number of samples, $y_i$ is the ground-truth label, and $\hat{y}_i$ is the model prediction. 
+
+The micro-F1 score was computed based on the total true positives (TP), false positives (FP), and false negatives (FN) across all classes, as follows:
+\begin{equation}\tag{15}
+\mathrm{Micro\text{-}F1}=\frac{2\cdot \mathrm{TP}}{2\cdot \mathrm{TP}+\mathrm{FP}+\mathrm{FN}}
+\end{equation}
+
+\subsection{Overall Results}
+Table 4 summarizes the classification results on the FruitsPark and UrbanStreetTree datasets. Overall, Transformer-based models significantly outperformed ResNet-based ones. In particular, the combination of Depth Augmentation achieved the highest accuracy among all configurations.
+
+Table 4. Result
+
+Method\quad UrbanStreetTree\quad FruitsPark
+
+Acc\quad Micro-F1\quad Acc\quad Micro-F1
+
+Baseline
+
+1\quad ResNet18 + GAP\quad 87．25\quad 82．52\quad 90．00\quad 90．00
+
+2\quad ResNet18 + MIL\quad 64．00\quad 64．34\quad 61．90\quad 61．90
+
+3\quad ViT + GAP\quad 79．20\quad 74．80\quad 89．00\quad 88．30
+
+4\quad ViT (DINO) + GAP\quad 66．43\quad 62．00\quad 78．09\quad 78．00
+
+ViT＋MIL
+
+5\quad ViT + MIL\quad 90．91\quad 88．66\quad 86．19\quad 86．05
+
+6\quad ViT (DINO) + MIL\quad 80．00\quad 80．00\quad 74．82\quad 70．00
+
+7\quad Swin + MIL\quad 74．50\quad 73．27\quad 87．62\quad 86．98
+
+Depth Augmentation
+
+8\quad ViT + MIL\quad 94．41\quad 93．84\quad 95．24\quad 95．16
+
+9\quad ViT (DINO) + MIL\quad 97．90\quad 97．76\quad 91．90\quad 91．89
+
+10\quad Swin + MIL\quad 90．21\quad 87．49\quad 85．24\quad 80．16
+
+Depth-guided Attention
+
+11\quad ViT + MIL\quad 91．61\quad 90．23\quad 90．48\quad 90．37
+
+12\quad ViT (DINO) + MIL\quad 93．71\quad 92．64\quad 91．90\quad 91．72
+
+13\quad ViT + MIL + Late Fusion\quad 90．91\quad 89．24\quad 85．24\quad 84．84
+
+14\quad ViT (DINO) + MIL + Late Fusion\quad 91．61\quad 89．20\quad 90．48\quad 90．14
+
+15\quad ViT + MIL + Piecewise Depth\quad 93．01\quad 90．91\quad 88．57\quad 88．52
+
+16\quad ViT (DINO) + MIL + Piecewise Depth\quad 93．71\quad 92．82\quad 88．57\quad 88．41
+
+\subsection{Baseline Comparison}
+ResNet18 with simple Global Average Pooling achieved high accuracy—87.25\% on UrbanStreetTree and 90.00\% on FruitsPark—but showed signs of overfitting to the training data. When the MIL structure was introduced, performance dropped substantially: ResNet18 + MIL achieved only 64.00\% on UrbanStreetTree and 61.90\% on FruitsPark.
+
+For ViT, the Global Pool configuration yielded slightly lower accuracy (79.20\% on UrbanStreetTree, 89.00\% on FruitsPark). While the self-attention mechanism of ViT enables global context modeling, the basic structure did not outperform ResNet18. When MIL was combined with ViT, accuracy improved to 90.91\% on UrbanStreetTree and 86.19\% on FruitsPark, indicating that multi-region aggregation contributes positively to performance.
+
+\subsection{Effect of DINO Pretraining}
+When the self-supervised pretrained DINO-ViT was used, accuracy significantly decreased in Global Pool configurations. Compared to the standard ViT (Method 3), DINO-ViT (Method 4) showed drops of 12.77\% on UrbanStreetTree and 10.91\% on FruitsPark. A similar trend was observed for MIL configurations: DINO-ViT + MIL (Method 6) performed 10.91\% and 12.19\% lower than ViT + MIL (Method 5) on UrbanStreetTree and FruitsPark, respectively. 
+
+However, in configurations that incorporated depth information, DINO models consistently improved performance. From Table 4 (Methods 9, 12, 14, and 16), DINO-based models achieved higher accuracy than their non-DINO counterparts on the Branch subset. In particular, Method 9 (Depth-guided Attention) improved accuracy by 3.49\% on UrbanStreetTree, though it decreased by 3.34\% on FruitsPark. Thus, while DINO contributed to improved generalization in some cases, its effectiveness was dataset dependent.
+
+\subsection{Effect of Depth Guidance}
+Depth-based augmentation produced the most significant improvements. Method 9 (ViT (DINO) + MIL + Depth Augmentation) achieved 97.90\% on UrbanStreetTree, while Method 8 (ViT + MIL + Depth Augmentation) achieved 95.24\% on FruitsPark, both being the highest accuracies overall. Regardless of DINO pretraining, depth-guided augmentation proved effective across both datasets. All depth-guided models (Methods 8–16) outperformed their respective baselines (Methods 1–4) on UrbanStreetTree, demonstrating consistent performance gains. On FruitsPark, more than half of the depth-guided models achieved improvements, although the degree of improvement varied by environment. Depth Augmentation tended to outperform Depth-guided Attention in terms of overall performance; however, certain Depth-guided Attention variants (Methods 12 and 16) achieved comparable performance levels, indicating that incorporating depth as an auxiliary attention signal can also be effective. These results demonstrate that the integration of depth information suppresses background influence and enhances the representation of essential tree structures.
+
+\subsection{Effects of Late Fusion and Piecewise Depth}
+Among all configurations, Methods 11 and 12 (without additional post-processing) showed the most stable performance, achieving 91.61\% and 93.71\% on UrbanStreetTree, and 93.29\% and 91.90\% on FruitsPark, respectively. Late Fusion (Methods 13 and 14) resulted in lower accuracies—90.91\% and 91.61\% on UrbanStreetTree, and 85.24\% and 90.48\% on FruitsPark—compared to the corresponding non-fusion methods. This indicates that logarithmic addition of depth weights does not stabilize the attention distribution and can even degrade accuracy. Piecewise Depth (Methods 15 and 16) yielded slightly higher accuracy than Methods 11 and 12 on UrbanStreetTree (93.01\% and 93.71\%) but lower on FruitsPark (88.57\% for both). Thus, the effect of Piecewise Depth varies by dataset: it provided limited improvements for UrbanStreetTree but reduced stability for FruitsPark. Overall, these results suggest that Late Fusion tends to degrade performance, while Piecewise Depth provides dataset-dependent effects.
+
+\subsection{Qualitative Evaluation}
+Figure 9–Figure 14 illustrate visual examples of attention maps from each method. Figure 8 shows CAM-based visualization for ResNet, while Figure 9–Figure 14 depict patch-level attention distributions from ABMIL. In Method 1 (ResNet + GAP), strong attention was directed toward background structures such as buildings, unrelated trees, and poles. 
+
+Method 5 (ViT + MIL) exhibited widely distributed attention across background elements (sky, roads, buildings, ground), failing to concentrate on the target tree structure.
+
+In contrast, Methods 8, 9, and 11, which employed depth information, showed concentrated attention on foreground elements such as trunks, branches, and leaves, with reduced background dispersion. This trend was consistent across both the UrbanStreetTree and FruitsPark datasets.
+
+Figure 10 and Figure 11 indicate that although DINO did not consistently change the attention pattern, some cases showed stronger focus along the trunk, supporting the intuitive correlation between accurate trunk localization and improved accuracy. Depth-guided Attention (Method 11) significantly improved trunk-focused attention compared to Method 5, though some samples still showed minor attention leakage into nearby background regions. 
+
+Late Fusion (Method 13) caused attention distributions to either over-concentrate or disperse excessively, resulting in sensitivity to irrelevant background features such as the ground. This suggests that the logarithmic addition of depth weights weakens local attention concentration, making target discrimination ambiguous.
+
+Piecewise Depth maintained relatively proper attention on trunk regions while moderately suppressing unnecessary focus on non-foreground areas. However, overall, Depth-guided Augmentation (Methods 8 and 9) produced more stable and interpretable attention distributions.
+
+These qualitative results confirm that depth guidance effectively enhances foreground emphasis, with Depth-guided Attention providing the most stable localization of essential tree structures.
+

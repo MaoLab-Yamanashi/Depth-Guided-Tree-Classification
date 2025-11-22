@@ -1,8 +1,8 @@
-This is e-upTeX, Version 3.141592653-p4.1.2-u2.00-250202-2.6 (utf8.euc) (TeX Live 2025) (preloaded format=platex 2025.11.20)  22 NOV 2025 12:24
+This is e-upTeX, Version 3.141592653-p4.1.2-u2.00-250202-2.6 (utf8.euc) (TeX Live 2025) (preloaded format=platex 2025.11.20)  22 NOV 2025 12:23
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
-**main.tex -halt-on-error
+**main.tex
 (./main.tex
 pLaTeX2e <2023-02-14>+1, based on
 LaTeX2e <2025-11-01>
@@ -495,7 +495,7 @@ File: l3backend-dvips.def 2025-10-09 L3 backend support: dvips
 \g__pdfannot_backend_link_int=\count346
 \g__pdfannot_backend_link_sf_int=\count347
 )
-(./main.aux)
+(latex_out/main.aux)
 \openout1 = `main.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 44.
@@ -529,7 +529,7 @@ Package wacv Warning: Package `hyperref' is not loaded with option `pagebackref
 ', which is strongly recommended for review version.
 
 Package hyperref Info: Link coloring ON on input line 44.
-(./main.out) (./main.out)
+(latex_out/main.out) (latex_out/main.out)
 \@outlinefile=\write3
 \openout3 = `main.out'.
 
@@ -586,7 +586,7 @@ File: t1phv.fd 2020/03/25 scalable font definitions for T1/phv.
 [4]) (./sec/5_results.tex [5] [6]) (./sec/6_discussion.tex [7])
 (./sec/7_conclusion.tex) (./sec/8_futurework.tex) [8] [9
 
-] (./main.aux)
+] (latex_out/main.aux)
  ***********
 pLaTeX2e <2023-02-14>+1, based on
 LaTeX2e <2025-11-01>
@@ -596,12 +596,12 @@ Package rerunfilecheck Info: File `main.out' has not changed.
 (rerunfilecheck)             Checksum: F3594809F459DAA37A0AAC8105BB620E;6927.
  ) 
 Here is how much of TeX's memory you used:
- 15455 strings out of 468182
- 253989 string characters out of 5434877
+ 15456 strings out of 468182
+ 254091 string characters out of 5434877
  759111 words of memory out of 5000000
  44145 multiletter control sequences out of 15000+600000
  668568 words of font info for 123 fonts, out of 8000000 for 9000
  929 hyphenation exceptions out of 8191
- 73i,14n,98p,1470b,704s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 73i,14n,98p,1455b,704s stack positions out of 10000i,1000n,20000p,200000b,200000s
 
-Output written on main.dvi (9 pages, 165576 bytes).
+Output written on latex_out/main.dvi (9 pages, 165576 bytes).

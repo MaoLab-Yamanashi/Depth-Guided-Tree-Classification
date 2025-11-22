@@ -1,0 +1,14 @@
+# Fdb version 4
+["dvipdf"] 0 "latex_out/Draft_ICIP2025.dvi" "latex_out/Draft_ICIP2025.pdf" "latex_out/Draft_ICIP2025" 0 -1
+  "latex_out/Draft_ICIP2025.dvi" 0 -1 0 "latex"
+  (generated)
+  "latex_out/Draft_ICIP2025.pdf"
+  (rewritten before read)
+["latex"] 0 "/Users/takahiro/latex/ICIP2025/Draft_ICIP2025.tex" "latex_out/Draft_ICIP2025.dvi" "Draft_ICIP2025" 0 -1
+  "/Users/takahiro/latex/ICIP2025/Draft_ICIP2025.tex" 0 -1 0 ""
+  "latex_out/Draft_ICIP2025.aux" 0 -1 0 "latex"
+  (generated)
+  "latex_out/Draft_ICIP2025.aux"
+  "latex_out/Draft_ICIP2025.dvi"
+  "latex_out/Draft_ICIP2025.log"
+  (rewritten before read)
