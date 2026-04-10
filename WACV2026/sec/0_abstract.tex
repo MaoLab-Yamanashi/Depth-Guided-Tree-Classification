@@ -1,7 +1,5 @@
 \begin{abstract}
-The ABSTRACT is to be in fully justified italicized text, at the top of the left-hand column, below the author and affiliation information.
-Use the word ``Abstract'' as the title, in 12-point Times, boldface type, centered relative to the column, initially capitalized.
-The abstract is to be in 10-point, single-spaced type.
-Leave two blank lines after the Abstract, then begin the main text.
-Look at previous \confName\ abstracts to get a feel for style and length.
+Tree classification in urban and orchard environments plays an important role in landscape management, agricultural support, and environmental monitoring. However, tree images captured from mid-range distances often include extensive background regions, leading models to overfit contextual information rather than intrinsic features such as trunks and branches. In this study, we propose a trunk-focused learning framework that integrates the ViT with ABMIL. Furthermore, we introduce Depth-guided Attention and Depth-guided Augmentation, which incorporate depth maps estimated by the MiDaS model into both data augmentation and attention computation stages to guide the model’s focus toward foreground structures such as trunks and branches. Comparative experiments were conducted on 16 configurations using the FruitsPark dataset collected at Fuefuki Fruits Park, Yamanashi Prefecture, Japan, and the UrbanStreetTree dataset containing urban street tree images from China. The proposed depth-guided methods significantly outperformed conventional CNN and ViT models, achieving accuracies of up to 97.9\% on UrbanStreetTree dataset and 95.2\% on FruitsPark dataset. Visualization of attention maps further confirmed stable focus on trunk and branch regions facilitated by depth information, suggesting that depth signals serve as an effective auxiliary cue for suppressing background dependency.
 \end{abstract}
+
+\noindent\textbf{Keywords}---Vision Transformer (ViT), Attention-based Multiple Instance Learning (ABMIL), Depth-guided Attention, Depth-guided Augmentation, Tree Classification, Background Suppression, Urban Forestry

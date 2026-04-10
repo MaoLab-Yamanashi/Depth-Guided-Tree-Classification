@@ -1,0 +1,101 @@
+\section{Method}
+
+The proposed method is based on the ViT \cite{ref1} and combines ABMIL \cite{ref2} for patch-level attention learning with depth estimation (MiDaS) \cite{ref3} to guide foreground awareness. In addition, top-k selection and Laplacian-based enhancement are incorporated to highlight local trunk structures and mitigate background dependency. During training, Depth-guided Augmentation or Depth-guided Attention is applied to improve the model’s generalization ability.
+
+\subsection{Overview of the Method}
+This study focuses on the effect of incorporating depth information at different stages and compares four model configurations, including those without depth usage. Depth maps are estimated and optionally employed either as auxiliary input signals or as attention guidance during learning. Figure~4 shows an overview of each configuration. This design allows investigation of how the integration point of depth information (none / input-level / attention-level) influences classification performance. In all cases, depth information is used only during training, while inference is performed solely with RGB images. Although depth maps can theoretically be employed as additional inputs, they are often unavailable or unreliable in real-world settings. Therefore, this study adopts a training-only strategy that leverages depth as a structural supervisory signal, improving the model’s generalizability and practical usability by eliminating dependence on depth estimation during inference.
+
+\noindent Baseline:\quad
+In this configuration, the input image is directly fed into one of the backbone models (ResNet18 \cite{ref12}, ViT \cite{ref1}, or DINO-ViT \cite{ref13}). Classification is performed using either Global Average Pooling (GAP) or ABMIL \cite{ref2}. No depth information is used, and all image regions are treated equally. This series serves as a pure baseline without any depth guidance.
+
+\noindent ViT + MIL:\quad
+In this configuration, the ViT architecture \cite{ref1} is combined with MIL \cite{ref2}, enabling the model to process images at the patch level and automatically extract important regions. ABMIL aggregates multiple local cues, such as trunks, branches, and leaves, into a unified global prediction. This approach learns structural attention without relying on depth information.
+
+\noindent Depth-guided Augmentation:\quad
+Based on depth maps, near-field regions (trunks and branches) are preserved, while far-field regions are varied to guide the ABMIL attention mechanism. Although the model structure is identical to the baseline, depth information is used only in the data augmentation stage. This allows the model to implicitly learn to focus on relevant foreground regions.
+
+\noindent Depth-guided Attention:\quad
+In this configuration, depth maps are incorporated into the attention computation as auxiliary signals. The attention weights for distant background regions are suppressed, while attention toward near-field structures such as trunks and branches is enhanced. This category also includes derived methods such as Late Fusion and Piecewise Depth, which integrate depth information at the attention stage to suppress background dependency and promote selective focus on foreground regions.
+
+\subsection{Classification Using ViT + ABMIL}
+\paragraph{Feature Extraction and Bag Construction.}
+An input image $x$ is divided into $N$ patches of size $P\times P$, and each patch $p_i$ is mapped into a feature space through the ViT patch embedding function $\phi(\cdot)$:
+\begin{equation}\tag{1}
+z_i = \phi(p_i) \in \mathbb{R}^d,\quad i=1,\ldots,N
+\end{equation}
+where $\phi(\cdot)$ includes linear patch embedding and the Transformer encoder with self-attention \cite{ref1}. The obtained feature set $Z=[z_1,\ldots,z_N ]^\top$ is processed by the ABMIL weighting mechanism \cite{ref2}, defined as follows:
+\begin{equation}\tag{2}
+e_i=\bm{w}^\top \tanh(\mathbf{W} z_i + \bm{b})
+\end{equation}
+\begin{equation}\tag{3}
+a_i=\frac{\exp(e_i/\tau)}{\sum_{j=1}^{N}\exp(e_j/\tau)}
+\end{equation}
+where $\mathbf{W}$, $\bm{w}$ and $\bm{b}$ are learnable parameters, and $\tau$ is a temperature parameter controlling the sharpness of the attention distribution. In this study, the normalization function can be replaced by entmax or top-$k$ normalization instead of the standard softmax. Entmax ($\alpha = 1.5$) naturally produces sparse attention, while top-$k$ normalization retains only the top percentage of patches, thereby emphasizing salient local regions such as trunks and branches. The bag-level representation $s$ is obtained as the weighted average of features based on attention scores:
+\begin{equation}\tag{4}
+s=\sum_{i=1}^N a_i z_i
+\end{equation}
+Finally, class probabilities are computed using a linear layer followed by a softmax function:
+\begin{equation}\tag{5}
+p(y=c \mid x)=\operatorname{softmax}_c (\mathbf{W}_c s+\bm{b}_c)
+\end{equation}
+The classification loss is defined as the cross-entropy between the predicted and ground-truth labels:
+\begin{equation}\tag{6}
+L_{\mathrm{cls}}=-\sum_{c=1}^{C} y_c \log\bigl(p(y=c\mid x)\bigr)
+\end{equation}
+Through this formulation, ABMIL selectively emphasizes important regions within the ViT-extracted patch features, enabling the model to focus on structural information such as trunks and branches while reducing reliance on background cues.
+
+\subsection{Trunk-Biased Sampling}
+To prioritize the learning of highly textured regions such as tree trunks and bark, a trunk-biased sampling strategy is introduced in the instance generation process of ABMIL \cite{ref2}. This method scores local regions according to their texture intensity and preferentially selects high-score patches during patch extraction, thereby constructing bags that contain more trunk information.
+
+Given an input image $I$, a sliding window with stride $s$ is applied to generate a candidate patch set $\mathcal{C}$. For each patch $q\in\mathcal{C}$, a texture score $S(q)$ is computed on the grayscale image using one of the following indicators:
+\begin{equation}\tag{7}
+S_{\mathrm{lapvar}}(q)=\mathrm{Var}(\mathrm{Laplacian}(q))
+\end{equation}
+\begin{equation}\tag{8}
+S_{\mathrm{sobel}}(q)=\mathbb{E}\bigl[\lVert \nabla q\rVert^2\bigr]
+\end{equation}
+\begin{equation}\tag{9}
+S_{\mathrm{hpf}}(q)=\mathbb{E}\bigl[(\mathrm{HPF}(q))^2\bigr]
+\end{equation}
+These correspond to Laplacian variance, Sobel energy, and high-pass energy, respectively. By default, the Laplacian variance metric is used. The patches are sorted in descending order of $S(q)$, and the top $\lfloor K\beta\rfloor$ patches (where $\beta$ denotes the trunk bias ratio) are deterministically selected as high-score regions. The remaining $K-\lfloor K\beta\rfloor$ patches are uniformly sampled from the rest of the candidates to maintain bag diversity.
+
+To prevent overfitting to background patterns, a slight Gaussian blur and brightness scaling are probabilistically applied to a subset of low-score regions with probability $p$, weakening background-dominant patterns. This process, implemented as a Trunk-Biased Sliding Sampler, is alternated with random sampling at a 50\% probability (mixed mode) during training to balance structural emphasis and diversity.
+
+\subsection{Loss Function and Regularization}
+The final loss function combines the bag-level classification loss with regularization terms that control the sparsity and smoothness of the attention distribution, defined as follows:
+\begin{equation}\tag{10}
+L=L_{\mathrm{CE}}+\lambda_{\mathrm{ent}}\, H(\mathbf{A})+\lambda_{1}\,\lVert \mathbf{A}\rVert_{1}
+\end{equation}
+Here, $L_{\mathrm{CE}}$ represents the cross-entropy loss based on the bag representation. The entropy term $H(\mathbf{A})=-\sum_k A_k \log(A_k+\varepsilon)$ suppresses excessive attention concentration and encourages smoother distributions. The $\ell_1$ term $\lVert \mathbf{A}\rVert_1=\sum_k \lvert A_k\rvert$ promotes sparsity, guiding the model to focus selectively on a limited number of informative patches.
+
+\subsection{Depth-Guided Augmentation}
+During training, depth-guided augmentation is probabilistically applied using relative depth map. Foreground regions (trunks and branches) are preserved, while background regions are replaced or degraded using external natural images. The boundaries are smoothly blended through morphological operations and feathering. Standard photometric augmentations such as blur, color transformation, and JPEG compression are also applied to expand the variability in background and illumination conditions. This approach aims to prevent overfitting to background diversity inherent in mid-range tree images and to guide the model’s attention consistently toward intrinsic structures such as trunks and branches. As a result, even without depth input during inference, the model is expected to achieve reduced background dependency, robust trunk-boundary localization, and improved stability across dataset domain shifts. This augmentation is applied only to training data, while validation and test sets remain unaltered. Further details are described in IV.C.2) Depth-based Background Replacement.
+
+\subsection{Depth-Guided Attention}
+In the Depth-guided Attention model, depth thresholds previously had to be manually set depending on the dataset, which occasionally resulted in excessive background inclusion or the unintended removal of trunk regions. To overcome these limitations, depth information is directly incorporated into the attention computation. Depth guidance is active only during training; during inference, standard MIL-based attention inference is performed without depth input.
+
+\paragraph{Depth Normalization.}
+The relative depth is normalized to the range $[0, 1]$, and the mean depth of patch $i$ is denoted as $D_i$. The depth weighting $g(D_i)$ is defined as:
+\begin{equation}\tag{11}
+g(D_i)=
+\begin{cases}
+1, & (D_i\le t)\\
+\exp\{-\gamma(D_i-t)\}, & (D_i>t)
+\end{cases}
+\end{equation}
+where $t$ is the threshold and $\gamma$ controls the decay rate. This prior assign higher weights to near-field trunk regions and exponentially suppresses distant background contributions to prevent background-dominant attention flow.
+
+\paragraph{Late Fusion at the Score Level.}
+For each attention score $e_i$, depth is added logarithmically:
+\begin{equation}\tag{12}
+e_i \leftarrow e_i + \eta \, \log(g_i+\varepsilon)
+\end{equation}
+where $\eta$ is the fusion strength and $\varepsilon$ is a small constant for numerical stability.
+
+\paragraph{Geometric Mean Fusion after Attention.}
+After normalization, the attention $A_i$ and depth weight $g_i$ are blended via geometric mean and renormalized:
+\begin{equation}\tag{13}
+\hat{A}_i=\frac{A_i^{\,1-\lambda}\, g_i^{\,\lambda}}{\sum_j A_j^{\,1-\lambda}\, g_j^{\,\lambda}}
+\end{equation}
+where $\lambda$ controls the contribution of depth. This formulation preserves the learned attention structure while enhancing emphasis on near-field trunk regions.
+

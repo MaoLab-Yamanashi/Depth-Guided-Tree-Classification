@@ -1,0 +1,21 @@
+\section{Introduction}
+\label{sec:introduction}
+
+Automatic classification of urban and orchard trees plays an important role in landscape management, agricultural support, and environmental monitoring within smart city frameworks\cite{ref4,ref5,ref6,ref7}. Previous studies have mainly focused on classifying leaves, flowers, fruits, or close-up images of tree trunks \cite{ref5,ref6,ref7,ref9,ref10}. However, in practical applications, close-range images of target trees are not always available, and it is often necessary to use mid-range images captured from a certain distance, as illustrated in Figure~1.
+
+(a) Close-range images\quad (b) Mid-range images
+
+Figure 1. Sample images of tree trunks captured at different distances
+
+In mid-range images, trees occupy only a small portion of the frame, and large background regions are inevitably included. As a result, learning models tend to depend heavily on background features. In fact, it has been observed that high classification accuracy can sometimes be achieved using background information alone, which poses the risk of the model overfitting to contextual patterns rather than to intrinsic features such as trunks and leaves. This effect is particularly evident when models are trained on small datasets collected from limited viewpoints or locations, where background diversity is low. Conversely, datasets captured under diverse environmental conditions are expected to mitigate such background bias.
+
+Moreover, species classification from mid-range images often requires manual annotation of trunk regions, which remains a labor-intensive and costly process. In addition, the distance between the camera and the tree, as well as the image resolution, significantly affects the texture of the bark. For example, two trunks that appear to have the same width in an image may represent completely different textures—such as a thin trunk captured at close range and a thick trunk photographed from afar, as illustrated in Figure~2, Figure~3. This issue, known as the texture degradation and distance inconsistency problem, has been reported as a major challenge in mid-range tree recognition.
+
+To address these issues, this study proposes a classification framework that integrates the Vision Transformer (ViT) \cite{ref1} with Attention-based Multiple Instance Learning (ABMIL)\cite{ref2}, aimed at emphasizing intrinsic tree features such as trunks and branches while suppressing background interference in mid-range images. Furthermore, we integrate depth estimation using the MiDaS \cite{ref3} model and background suppression methods such as top-k selection and Laplacian-based filtering to reduce background bias, aiming to achieve more robust and reliable tree classification across diverse environments.
+
+(a) 20cm 1m\quad (b) 30cm 3m\quad (c) 40cm 4m\quad (d) 60cm 6m
+
+Figure 2. Texture degradation and distance inconsistency problem in mid-range tree images: Each image shows a tree trunk of different diameter and capture distance.
+
+Figure 3. Relative texture feature degradation
+
