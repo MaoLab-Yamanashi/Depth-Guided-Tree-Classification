@@ -118,15 +118,15 @@ The proposed framework converts a mid-range tree image into a sparse bag of stru
 \end{figure*}
 
 \subsection{Image-to-Bag Construction}
-Given an input image $x$, candidate patches are generated with a sliding window. Let $\mathcal{C}(x)=\{q_1,\ldots,q_M\}$ denote the candidate patch set. A sparse bag $\mathcal{B}(x)$ is selected from $\mathcal{C}(x)$ according to a bag ratio $\rho \in (0,1]$, so that approximately $K=\lfloor \rho M \rfloor$ patches are processed by the MIL model. Unlike a fixed patch count, the ratio-based definition preserves a comparable fraction of available local evidence across images with different effective resolutions.
+Given an input image $x$, candidate patches are generated with a sliding window on the original image resolution. Let $\mathcal{C}(x)=\{q_1,\ldots,q_M\}$ denote the candidate patch set. A sparse bag $\mathcal{B}(x)$ is selected from $\mathcal{C}(x)$ according to a bag ratio $\rho \in (0,1]$, so that approximately $K=\mathrm{round}(\rho M)$ patches are processed by the MIL model. Unlike a fixed patch count, the ratio-based definition preserves a comparable fraction of available local evidence across images with different effective resolutions.
 
 \subsection{Trunk-Biased Sampling}
-TBS prioritizes candidate patches that are likely to contain high-frequency tree structures such as bark edges, trunk boundaries, and branch contours. For each candidate patch $q$, a Sobel score is computed as
+TBS prioritizes candidate patches that are likely to contain high-frequency tree structures such as bark edges, trunk boundaries, and branch contours. Candidate patches are extracted with a 224-pixel window and a 160-pixel stride; border regions outside the sliding grid are not forcibly added. For each candidate patch $q$, a Sobel score is computed as
 \begin{equation}
 S_{\mathrm{sobel}}(q)=\frac{1}{|q|}\sum_{u \in q}\|\nabla I(u)\|_2,
 \label{eq:sobel}
 \end{equation}
-where $I$ is the image intensity and $u$ indexes pixels in the patch. Candidate patches are ranked by $S_{\mathrm{sobel}}$. A trunk-bias parameter $\beta$ controls how strongly the sampler favors high-score patches. In the paper-facing setting, we use sliding candidates, $\beta=0.5$, a candidate multiplier of 4.0, and a stride of 160 pixels.
+where $I$ is the image intensity and $u$ indexes pixels in the patch. Candidate patches are ranked by $S_{\mathrm{sobel}}$. A trunk-bias parameter $\beta$ controls the fraction of the selected bag that is deterministically filled from the highest-scoring candidates. The remaining instances are filled from lower-ranked candidates using a seed-controlled shuffle. In the reported sliding-window TBS setting, we use $\beta=0.5$.
 
 This selection is intentionally simple and deterministic. It is not intended to segment the trunk exactly; rather, it shifts the sparse bag toward structurally informative regions while retaining enough diversity for ABMIL to learn which patches are useful.
 
@@ -156,22 +156,22 @@ and class probabilities are produced by a linear classifier followed by softmax:
 p(y=c\mid x)=\mathrm{softmax}(W_c s+b_c).
 \label{eq:classification}
 \end{equation}
-Training minimizes cross-entropy with balanced elastic-net regularization on the attention distribution:
+Training minimizes cross-entropy with a small penalty on the concentration of the normalized attention distribution:
 \begin{equation}
-\mathcal{L}=\mathcal{L}_{\mathrm{CE}}+\lambda_1\|a\|_1+\lambda_2\|a\|_2^2.
+\mathcal{L}=\mathcal{L}_{\mathrm{CE}}+\lambda_a\|a\|_2^2.
 \label{eq:loss}
 \end{equation}
-In the main protocol, $\lambda_1=\lambda_2=5\times 10^{-4}$ and entropy regularization is disabled.
+The effective sparsity in this work comes primarily from sparse instance selection by TBS rather than from an $\ell_1$ penalty on softmax-normalized attention, whose $\ell_1$ norm is constant. In the main protocol, $\lambda_a=5\times 10^{-4}$ and entropy regularization is disabled.
 
 \subsection{Depth-Guided Augmentation}
 DepthAug uses pseudo-depth maps estimated from RGB images to construct training images in which foreground tree structures are preserved and background regions are perturbed. The purpose is not to add depth as an inference-time modality, but to weaken label-correlated background shortcuts during learning.
 
 Let $D(x)$ be a normalized relative depth map and $m(x)$ a foreground mask derived from $D(x)$ by thresholding and morphological smoothing. A depth-augmented training image is formed as
 \begin{equation}
-\tilde{x}=m(x)\odot x + (1-m(x))\odot T(x,r),
+\tilde{x}=m(x)\odot x + (1-m(x))\odot T(x),
 \label{eq:depth_aug}
 \end{equation}
-where $T(\cdot)$ applies background perturbations such as blur, color transformation, compression, or replacement with an external natural scene $r$. Validation and test images are not augmented in this way. At inference, the model receives only RGB images and uses the same TBS and ABMIL pipeline.
+where $T(\cdot)$ applies background perturbations such as blur, color transformation, or compression. Validation and test images are not augmented in this way. At inference, the model receives only RGB images and uses the same TBS and ABMIL pipeline.
 
 \section{Experimental Setup}
 \label{sec:experiments}
@@ -211,14 +211,14 @@ Final evaluation split & Validation & Test \\
 \end{table}
 
 \subsection{Compared Models}
-The overall comparison includes three groups. First, image-level GAP baselines use ResNet18 \cite{resnet}, ViT \cite{vit}, DINO/DINOv2/DINOv3 ViT backbones \cite{dino,dinov2,dinov3}, and Swin Transformer \cite{swin}. These baselines use trainable backbones. Second, sparse MIL models use frozen backbones and TBS with $\rho=0.3$. Third, sparse DepthAug models use the same sparse MIL setting but train on depth-augmented datasets constructed from the \texttt{only\_blur/aug\_midas\_large} variants. All reported results use four seeds: 0042, 2024, 2025, and 3407.
+The overall comparison includes three groups. First, image-level GAP baselines use ResNet18 \cite{resnet}, ViT \cite{vit}, DINO/DINOv2/DINOv3 ViT backbones \cite{dino,dinov2,dinov3}, and Swin Transformer \cite{swin}. These baselines use trainable backbones. Second, sparse MIL models use frozen backbones and TBS with $\rho=0.3$. Third, sparse DepthAug models use the same sparse MIL setting but train on depth-augmented datasets. The arrows in Table~\ref{tab:overall_results} compare the reported image-level and MIL protocols within the same backbone family; they should be interpreted as protocol-level differences rather than a strictly matched frozen-backbone linear-probe comparison. All reported results use four seeds: 0042, 2024, 2025, and 3407.
 
 The Pareto efficiency experiment fixes the backbone to DINOv2 and the model family to TBS sparse MIL with DepthAug, then sweeps $\rho \in \{0.1,0.2,\ldots,1.0\}$ over four seeds. We report accuracy, macro-$F_1$, and average instances per bag. Patch instances are a direct proxy for encoder workload; wall-clock latency should be measured separately before making deployment-specific timing claims.
 
 We also include two sparse-selection checks. First, a fixed-budget condition ablation compares full training/full evaluation, full training/sparse evaluation, random sparse training/evaluation, TBS sparse training/evaluation, and TBS sparse training with DepthAug followed by sparse RGB evaluation. Second, a ratio-wise comparison evaluates the proposed TBS-DepthAug configuration against random sparse sampling at the same bag ratios. These analyses are used to determine whether the proposed sampling and augmentation strategy improves over patch-count reduction alone.
 
 \subsection{Implementation Details}
-All models are trained for 30 epochs. GAP baselines use batch size 32, whereas MIL models use batch size 1 because each image is represented as a patch bag. Dataset-specific normalization is computed from the training split. Sparse MIL and DepthAug models use softmax ABMIL attention, Sobel TBS scoring, $\lambda_1=\lambda_2=5\times10^{-4}$, no entropy regularization, and automatic mixed precision. The experiments were run on a workstation with NVIDIA RTX A6000 GPUs, CUDA 12.9, an AMD Ryzen Threadripper 7960X CPU, and 62 GiB system memory.
+All models are trained for 30 epochs. GAP baselines use batch size 32, whereas MIL models use batch size 1 because each image is represented as a patch bag. Dataset-specific normalization is computed from the training split. Sparse MIL and DepthAug models use softmax ABMIL attention, Sobel TBS scoring, $\lambda_a=5\times10^{-4}$, no entropy regularization, and automatic mixed precision. The experiments were run on a workstation with NVIDIA RTX A6000 GPUs, CUDA 12.9, an AMD Ryzen Threadripper 7960X CPU, and 62 GiB system memory.
 
 \section{Results}
 \label{sec:results}
@@ -228,7 +228,7 @@ Table~\ref{tab:overall_results} reports the complete four-seed results for the f
 
 \begin{table*}[t]
 \centering
-\caption{Complete four-seed results for all configurations. Values are mean $\pm$ standard deviation in percent. FruitsPark is evaluated on validation; UrbanStreetTree is evaluated on test. Colored arrows show the change in percentage points relative to the Image-level GAP baseline of the same backbone: blue upward arrows indicate gains and red downward arrows indicate losses.}
+\caption{Complete four-seed results for all configurations. Values are mean $\pm$ standard deviation in percent. FruitsPark is evaluated on validation; UrbanStreetTree is evaluated on test. Colored arrows show the change in percentage points relative to the reported Image-level GAP protocol of the same backbone family: blue upward arrows indicate gains and red downward arrows indicate losses.}
 \label{tab:overall_results}
 \scriptsize
 \resizebox{\textwidth}{!}{%
@@ -319,26 +319,14 @@ UrbanStreetTree & Efficient within 1pp & 0.4 & $95.98 \pm 0.88$ & 95.22 & 163.3 
 \end{tabular}}
 \end{table*}
 
-Table~\ref{tab:random_compare} compares the proposed TBS-DepthAug ratio sweep with random sparse sampling. Random sparse sampling is a strong baseline and is sometimes more patch-efficient at a specific ratio, especially on FruitsPark. Nevertheless, the proposed method achieves the highest observed accuracy on both datasets. On UrbanStreetTree, the proposed efficient point reaches 95.98\% accuracy at $\rho=0.4$, compared with the best random sparse accuracy of 95.80\% at $\rho=0.3$. On FruitsPark, random sparse reaches 96.07\% accuracy with 40.0 patches at $\rho=0.6$, while the proposed method reaches a higher best accuracy of 96.79\% at $\rho=1.0$ and matches 96.07\% accuracy at its within-1pp efficient point.
+Fig.~\ref{fig:random_ratio_stability} compares the proposed TBS-DepthAug ratio sweep with random sparse sampling using mean and standard deviation over four seeds. Random sparse sampling is a strong stochastic baseline: because it can occasionally include highly informative patches, it can match or exceed the proposed method at isolated patch budgets. However, its performance is less stable across the ratio sweep, and unfavorable samples can produce noticeably weaker results. On FruitsPark, random sparse peaks at $\rho=0.6$ and then degrades as more random patches are added, and on UrbanStreetTree it peaks at $\rho=0.3$ before dropping at nearby ratios. The proposed method does not dominate random sampling at every budget, but it reaches the highest observed mean accuracy on both datasets and forms a more reliable high-performance region in the ratio sweep. This supports the interpretation that the contribution is not patch-count reduction alone, but more stable structure-biased sparse selection combined with depth-guided training-time perturbation.
 
-\begin{table*}[t]
+\begin{figure*}[t]
 \centering
-\caption{Proposed TBS-DepthAug versus random sparse sampling in the ratio sweep.}
-\label{tab:random_compare}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{llccccc}
-\toprule
-Dataset & Method & Point & Bag ratio & Patches & Accuracy (\%) & Macro-$F_1$ (\%) \\
-\midrule
-FruitsPark & Proposed & Best & 1.0 & 66.0 & 96.79 & 96.79 \\
-FruitsPark & Proposed & Within 1pp & 0.8 & 53.0 & 96.07 & 96.01 \\
-FruitsPark & Random & Best / Within 1pp & 0.6 & 40.0 & 96.07 & 96.05 \\
-UrbanStreetTree & Proposed & Best & 0.9 & 367.2 & 96.33 & 95.83 \\
-UrbanStreetTree & Proposed & Within 1pp & 0.4 & 163.3 & 95.98 & 95.22 \\
-UrbanStreetTree & Random & Best / Within 1pp & 0.3 & 122.7 & 95.80 & 95.08 \\
-\bottomrule
-\end{tabular}}
-\end{table*}
+\includegraphics[width=\textwidth]{figures/fig20_random_performance_by_ratio.png}
+\caption{Proposed TBS-DepthAug versus random sparse sampling across bag ratios. Markers show four-seed means and error bars show standard deviations. Random sparse sampling is competitive at some isolated ratios, but its performance is more ratio-dependent; the proposed method gives the highest observed mean accuracy on both datasets while maintaining a more stable high-performance region.}
+\label{fig:random_ratio_stability}
+\end{figure*}
 
 \begin{figure*}[t]
 \centering
@@ -361,7 +349,7 @@ Attention visualizations can be useful diagnostics for checking whether high-wei
 \label{sec:discussion}
 
 \subsection{Why Sparse MIL Helps}
-Mid-range tree classification requires the model to preserve fine local evidence while reasoning over the entire object structure. Standard image-level resizing can dilute trunk and bark information, especially when the tree occupies a small region. ABMIL avoids forcing the whole image into one global descriptor; it lets the model assign weights to local patches. TBS makes this practical by reducing the number of instances and biasing the bag toward structural patches before feature extraction. The random-comparison experiment also shows that random sparse sampling is not a weak baseline: patch-count reduction alone can be competitive at some ratios. The value of TBS-DepthAug is therefore not that it dominates random sampling at every patch budget, but that it improves the fixed sparse condition and produces higher best-accuracy points while retaining a practical sparse operating point.
+Mid-range tree classification requires the model to preserve fine local evidence while reasoning over the entire object structure. Standard image-level resizing can dilute trunk and bark information, especially when the tree occupies a small region. ABMIL avoids forcing the whole image into one global descriptor; it lets the model assign weights to local patches. TBS makes this practical by reducing the number of instances and biasing the bag toward structural patches before feature extraction. The random-comparison experiment also shows that random sparse sampling is not a weak baseline: by chance, it can select useful patches and become competitive at some ratios. The value of TBS-DepthAug is therefore not that it dominates random sampling at every patch budget, but that it reduces dependence on favorable random draws, improves the fixed sparse condition, and produces higher best-accuracy points while retaining a practical sparse operating point.
 
 \subsection{Why DepthAug Helps on UrbanStreetTree}
 UrbanStreetTree contains complex street backgrounds and an independent test split, making it a strong setting for evaluating background shortcut suppression. The consistent DepthAug gains across backbones suggest that perturbing depth-derived background regions during training prevents the classifier from relying on scene context alone. Importantly, DepthAug does not impose a depth sensor requirement at inference, which is essential for mobile and low-cost deployment.
