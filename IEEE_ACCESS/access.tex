@@ -7,11 +7,14 @@
 \usepackage{multirow}
 \usepackage{array}
 \usepackage{url}
-\usepackage{float}
 \usepackage{textcomp}
 
 \newdimen\xfigwd
 \xfigwd=\columnwidth
+\definecolor{GainBlue}{RGB}{0,82,155}
+\definecolor{LossRed}{RGB}{178,34,34}
+\newcommand{\gain}[1]{\,{\scriptsize\textcolor{GainBlue}{($\uparrow$#1)}}}
+\newcommand{\loss}[1]{\,{\scriptsize\textcolor{LossRed}{($\downarrow$#1)}}}
 
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
@@ -21,26 +24,26 @@
 \history{Date of publication xxxx 00, 0000, date of current version xxxx 00, 0000.}
 \doi{10.1109/ACCESS.2026.DOI}
 
-\title{Depth-Guided and Tree-Focused Learning for Tree Classification under Complex Backgrounds}
+\title{Depth-Regularized Sparse Multiple Instance Learning for Mid-Range Tree Species Classification under Background-Dominant Conditions}
 
 \author{\uppercase{Takahiro Matsumura}\authorrefmark{1}}
 
-\address[1]{Affiliation to be confirmed. The source PDF metadata lists Takahiro Matsumura as the author.}
+\address[1]{Affiliation to be confirmed.}
 
-\tfootnote{This manuscript reorganizes the content of the source paper \texttt{vit-mil-conference-template-a4.pdf} into the IEEE Access \LaTeX{} template. Author affiliations and correspondence details should be verified before submission.}
+\tfootnote{Author affiliation, funding information, and correspondence details should be verified before submission.}
 
 \markboth
-{T. Matsumura: Depth-Guided and Tree-Focused Learning for Tree Classification under Complex Backgrounds}
-{T. Matsumura: Depth-Guided and Tree-Focused Learning for Tree Classification under Complex Backgrounds}
+{T. Matsumura: Depth-Regularized Sparse MIL for Mid-Range Tree Species Classification}
+{T. Matsumura: Depth-Regularized Sparse MIL for Mid-Range Tree Species Classification}
 
 \corresp{Corresponding author: Takahiro Matsumura (contact details to be confirmed).}
 
 \begin{abstract}
-Tree classification in urban and orchard environments plays an important role in landscape management, agricultural support, and environmental monitoring. However, tree images captured from mid-range distances often include extensive background regions, leading models to overfit contextual information rather than intrinsic features such as trunks and branches. In this study, we propose a trunk-focused learning framework that integrates the Vision Transformer (ViT) with attention-based multiple instance learning (ABMIL). Furthermore, we introduce Depth-guided Attention and Depth-guided Augmentation, which incorporate depth maps estimated by the MiDaS model into both data augmentation and attention computation stages to guide the model's focus toward foreground structures such as trunks and branches. Comparative experiments were conducted on 16 configurations using the FruitsPark dataset collected at Fuefuki Fruits Park, Yamanashi Prefecture, Japan, and the UrbanStreetTree dataset containing urban street tree images from China. The proposed depth-guided methods significantly outperformed conventional CNN and ViT models, achieving accuracies of up to 97.9\% on the UrbanStreetTree dataset and 95.2\% on the FruitsPark dataset. Visualization of attention maps further confirmed stable focus on trunk and branch regions facilitated by depth information, suggesting that depth signals serve as an effective auxiliary cue for suppressing background dependency.
+Tree species classification from ground-level images is important for urban forestry, orchard management, and ecological monitoring. Existing recognition systems often assume close-up views of leaves, flowers, fruits, or bark, whereas practical field images are frequently captured from mid-range distances. In this setting, discriminative evidence from trunks, branches, and bark occupies only a small part of the image, while buildings, roads, sky, signs, vehicles, and neighboring trees dominate the background. This creates a background-dominant weakly supervised recognition problem: image-level labels are available, but the informative regions are sparse and not manually annotated. This paper proposes a depth-regularized sparse multiple instance learning framework for mid-range tree species classification. Images are converted into bags of local patches, trunk-biased sampling selects structurally informative patches using gradient-based scores, and attention-based multiple instance learning aggregates the selected instances. Depth-guided augmentation is used only during training to preserve foreground tree structures while perturbing background regions, so inference requires RGB images only. Experiments on FruitsPark and UrbanStreetTree compare image-level baselines, sparse MIL, and sparse depth-augmented MIL under a four-seed protocol. In the fixed-budget backbone comparison on UrbanStreetTree, ViT DepthAug achieves 95.10\% accuracy and 94.27\% macro-$F_1$, improving over the corresponding ViT GAP baseline by 10.49 and 12.50 percentage points, respectively. A separate DINOv2 ratio sweep further shows that near-peak performance can be retained with substantially fewer patches: on UrbanStreetTree, a 0.4 bag ratio achieves 95.98\% accuracy, within 0.35 percentage points of the best result, while using 163.3 rather than 367.2 instances on average. These results indicate that depth-regularized sparse MIL is an effective and patch-efficient strategy for tree classification under background-dominant mid-range imaging conditions.
 \end{abstract}
 
 \begin{keywords}
-Attention-based multiple instance learning, background suppression, depth-guided attention, depth-guided augmentation, tree classification, urban forestry, Vision Transformer.
+Attention-based multiple instance learning, background bias, depth-guided augmentation, sparse patch selection, tree species classification, urban forestry, Vision Transformer.
 \end{keywords}
 
 \titlepgskip=-15pt
@@ -49,439 +52,397 @@ Attention-based multiple instance learning, background suppression, depth-guided
 \section{Introduction}
 \label{sec:introduction}
 
-Automatic classification of urban and orchard trees plays an important role in landscape management, agricultural support, and environmental monitoring within smart-city frameworks \cite{b4,b5,b6,b7}. Previous studies have mainly focused on classifying leaves, flowers, fruits, or close-up images of tree trunks \cite{b5,b6,b7,b9,b10}. However, in practical applications, close-range images of target trees are not always available, and it is often necessary to use mid-range images captured from a certain distance, as illustrated in Fig.~\ref{fig:distance_examples}.
+Automatic tree species classification supports urban green-space management, biodiversity surveys, orchard monitoring, and smart-city environmental inventories. Mobile and ground-level imaging is attractive because it is inexpensive and easy to deploy, but most successful plant and tree recognition pipelines have relied on close-up observations of leaves, flowers, fruits, or bark \cite{leafsnap,plantnet,barknet,centralbark}. Such assumptions do not always hold in field surveys. A user may capture an entire tree from several meters away, or an urban inventory system may observe a street tree from a pedestrian or vehicle viewpoint. In these mid-range images, the tree is only partly visible and the background often occupies most of the frame.
+
+This study focuses on the specific difficulty created by this imaging condition. The discriminative signal for species recognition is concentrated in trunks, branches, bark patterns, and local tree structures, but these regions are not annotated. At the same time, the image contains a large amount of scene context such as buildings, roads, sky, vehicles, signs, ground texture, and neighboring vegetation. Modern classifiers can exploit such context as a shortcut. Background dependence has been quantified in general object recognition \cite{backgroundbias} and in plant-disease datasets \cite{plantvillagebias}, where label-correlated background artifacts can be sufficient for non-trivial classification. In mid-range tree images, this risk is amplified because the object evidence is sparse and the background area is large.
+
+Close-up bark classification provides a second useful but incomplete precedent. BarkNet 1.0 and CentralBark show that bark is a strong year-round cue for tree recognition \cite{barknet,centralbark}. However, these datasets are dominated by close-range bark imagery. When a trunk is observed from a distance, the effective resolution of bark texture decreases, and the same apparent trunk width in the image may correspond to very different physical scales. Thus, mid-range tree species classification requires a method that can preserve local evidence without depending on manual trunk crops and can combine weak local cues with broader structural information.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.9\columnwidth]{figures/fig01_samples.png}
-\caption{Sample images of tree trunks captured at different distances.}
+\caption{Examples of tree images captured at different distances. Mid-range observations contain larger background regions and weaker local bark texture than close-up observations.}
 \label{fig:distance_examples}
 \end{figure}
 
-In mid-range images, trees occupy only a small portion of the frame, and large background regions are inevitably included. As a result, learning models tend to depend heavily on background features. High classification accuracy can sometimes be achieved using background information alone, which creates the risk that a model overfits contextual patterns rather than intrinsic features such as trunks and leaves. This effect becomes particularly severe when models are trained on small datasets collected from limited viewpoints or locations, where background diversity is low. Conversely, datasets captured under diverse environmental conditions are expected to mitigate such background bias.
+We formulate this setting as a background-dominant multiple instance learning (MIL) problem. An image is represented as a bag of patches, only the image-level species label is available, and the classifier must infer which instances are informative. Attention-based MIL (ABMIL) provides a differentiable pooling mechanism that assigns weights to instances and yields patch-level diagnostics \cite{abmil}. However, full-patch MIL is computationally expensive when high-resolution images are processed densely, and recent sparse MIL studies have shown that instance selection, masking, and pruning are important design axes rather than mere implementation details \cite{pamil,mhim,acmil,keypatches,hdmil}. Naive sparse sampling can discard useful trunk or branch patches. We therefore introduce trunk-biased sampling (TBS), which selects a sparse subset of candidate patches by combining sliding-window coverage with gradient-based structural scores. To reduce background shortcuts during training, we further use depth-guided augmentation (DepthAug), which preserves depth-derived foreground structures while perturbing background regions. Depth is used only for data construction or training-time augmentation; the final model uses RGB images only at inference.
 
-Moreover, species classification from mid-range images often requires manual annotation of trunk regions, which remains a labor-intensive and costly process. The distance between the camera and the tree, as well as the image resolution, also significantly affects bark texture. For example, two trunks that appear to have the same width in an image may represent completely different textures, such as a thin trunk captured at close range and a thick trunk photographed from afar, as illustrated in Figs.~\ref{fig:distance_problem} and \ref{fig:texture_problem}. This issue, referred to here as the texture degradation and distance inconsistency problem, is a major challenge in mid-range tree recognition.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\columnwidth]{figures/fig02_distance_inconsistency.png}
-\caption{Texture degradation and distance inconsistency problem in mid-range tree images. Each example shows a tree trunk with a different diameter and capture distance.}
-\label{fig:distance_problem}
-\end{figure}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\columnwidth]{figures/fig03_texture_degradation.png}
-\caption{Relative texture feature degradation caused by image scale and shooting distance.}
-\label{fig:texture_problem}
-\end{figure}
-
-To address these issues, this study proposes a classification framework that integrates the Vision Transformer (ViT) \cite{b1} with attention-based multiple instance learning (ABMIL) \cite{b2}. The goal is to emphasize intrinsic tree features such as trunks and branches while suppressing background interference in mid-range images. In addition, the framework incorporates depth estimation based on MiDaS \cite{b3} and background-suppression mechanisms such as top-$k$ selection and Laplacian-based filtering to reduce background bias and achieve more robust tree classification across diverse environments.
+The contributions of this paper are as follows:
+\begin{itemize}
+\item We formulate ground-level mid-range tree species classification as a background-dominant weakly supervised patch aggregation problem.
+\item We propose a sparse MIL framework that combines trunk-biased patch selection, Vision Transformer-based feature extraction, and ABMIL aggregation.
+\item We incorporate depth-guided augmentation as a training-only regularizer for suppressing background shortcuts without requiring depth at inference.
+\item We evaluate image-level baselines, sparse MIL, and sparse DepthAug MIL under a unified four-seed protocol on FruitsPark and UrbanStreetTree.
+\item We quantify the accuracy--patch-budget Pareto frontier and show that near-peak accuracy can be maintained with substantially fewer instances, especially on UrbanStreetTree.
+\end{itemize}
 
 \section{Related Work}
 \label{sec:relatedwork}
 
-\subsection{Significance of Tree Species Classification and Conventional Approaches}
-Tree species classification in urban environments is a fundamental technology for landscape management and conservation planning \cite{b4}. In recent years, automatic identification using smartphone applications has become increasingly common. Representative systems include LeafSnap \cite{b5}, Pl@ntNet \cite{b6}, and Folia \cite{b7}. These tools are widely used by citizens and in educational settings, providing an accessible platform for understanding urban biodiversity even for non-specialists. However, most of these applications rely primarily on close-up images, and research focusing on mid- or long-range observations remains limited. Furthermore, many existing methods require manual annotation for supervised classification, which raises labeling costs in practical use.
+\subsection{Tree Species Classification}
+Tree species recognition has been studied using leaves, flowers, fruits, bark, whole trees, aerial imagery, satellite imagery, and LiDAR. LeafSnap and Pl@ntNet popularized image-based plant identification with close-up organ observations \cite{leafsnap,plantnet}. Bark-based recognition is attractive because bark can be observed throughout the year. BarkNet 1.0 introduced a large bark dataset and reported strong performance with CNN-based classifiers \cite{barknet}; CentralBark further expanded standardized bark imagery for deep learning-based species recognition \cite{centralbark}. These studies demonstrate the value of bark texture, but their close-range assumptions differ from our mid-range setting, where the trunk is small and background interference is substantial.
 
-\subsection{Commonly Used Features and Limitations of Existing Datasets}
-Typical morphological features used for tree classification include leaves, bark, leaf shapes, flowers, and fruits. Among these, leaves are the most commonly used because they are easy to observe. Large-scale datasets such as Pl@ntLeaves \cite{b8} and LeafSnap \cite{b5} have contributed to the prevalence of leaf-based classification studies. However, leaves, flowers, and fruits are highly seasonal and cannot be used during leaf-off or non-flowering periods. In contrast, bark can be observed year-round and is therefore a promising feature independent of seasonal variation. Public datasets such as BarkNet 1.0 \cite{b9} and Bark-101 \cite{b10} have facilitated progress in bark-based classification research. Nevertheless, most of these datasets consist of close-up images captured under conditions with minimal background interference. When relying solely on texture features, differences between bark textures of various species can be subtle, and classification becomes even more challenging as trees age. Moreover, when trunks are photographed from mid- to long-range distances, variations in shooting distance and image resolution significantly affect texture representation, leading to severe accuracy degradation.
+Urban tree datasets have also expanded. UrbanStreetTree provides a comprehensive public dataset for image classification and instance segmentation across street-tree organs, including branches, and contains 41,467 high-resolution classification images across 50 species \cite{urbanstreettree}. Recent large-scale benchmarks such as StreetTree further show that street-level tree species classification is becoming an active research area \cite{streettree}. In contrast to dataset-scale contributions, our work addresses how to classify mid-range RGB images when target structures are sparsely distributed and no trunk-level annotation is available.
 
-\subsection{Urban Tree Datasets and Future Directions}
-Most existing tree datasets have been independently collected by individual researchers, resulting in limited interoperability and comparability across studies \cite{b4}. In contrast, the UrbanStreetTree dataset \cite{b11}, developed for urban street trees in China, covers multiple tree organs, including trunks, leaves, whole trees, branches, flowers, and fruits, and contains 41,467 images. A distinctive feature of that dataset is its detailed annotation of branch structures, which enables species identification even under challenging conditions such as winter leaf-off periods or painted trunks.
+\subsection{Background Bias and Mid-Range Recognition}
+Background bias is a major reliability issue in visual recognition. Xiao et al. showed that background-only information can support non-trivial ImageNet-9 classification and that adversarially chosen backgrounds can induce incorrect predictions even when the foreground is correctly classified \cite{backgroundbias}. Noyan reported that background pixels in PlantVillage contain label-correlated artifacts, allowing a classifier using only a few background pixels to exceed random guessing by a large margin \cite{plantvillagebias}. These findings are directly relevant to mid-range tree recognition because background pixels often dominate the image.
 
-\subsection{Positioning of This Study}
-To address the challenges described above, this study combines ViT \cite{b1} with ABMIL \cite{b2} to reduce background dependency and encourage the model to focus on trunk regions. MIL-based patch division allows the model to retain high-resolution local information while avoiding information loss due to aggressive resizing, thereby facilitating attention to fine-grained features even in long-distance images. By further leveraging the self-attention mechanism of the Transformer architecture, the proposed framework can simultaneously capture both local bark texture and global tree structure, leading to more robust and context-aware tree classification.
+Mid-range imaging also reduces the discriminative value of local texture. CNNs are known to rely strongly on texture cues, while shape-biased learning can improve robustness \cite{texturebias}. For tree species classification, this implies that close-up bark texture alone is insufficient; a model must combine local texture remnants with trunk and branch structure while avoiding scene context shortcuts.
+
+\subsection{MIL, Transformers, and Weak Local Evidence}
+MIL represents a sample as a bag of instances with only a bag-level label \cite{dietterich,carbonneau}. Deep MIL extended this idea to image classification and auto-annotation \cite{deepmil}, and ABMIL introduced learnable attention pooling for instance aggregation \cite{abmil}. In weakly supervised whole-slide image analysis, CLAM uses attention and clustering constraints to identify representative high-value regions from slide-level labels \cite{clam}, and DSMIL models instance- and bag-level evidence with a dual-stream architecture \cite{dsmil}. Transformer-based MIL methods such as TransMIL further model correlations among instances in whole-slide images \cite{transmil}. These works are conceptually related because they infer discriminative local regions from weak supervision.
+
+The present task differs in the distribution of useful evidence. In pathology, many tissue patches may contain task-relevant morphology. In mid-range tree images, informative trunk and branch patches can be a small minority, while visually strong background patterns are abundant. We therefore combine ABMIL with explicit sparse patch selection and depth-regularized training.
+
+Vision Transformers (ViT) process images as patch tokens and can model long-range relationships \cite{vit}. Swin Transformer introduces hierarchical shifted-window attention \cite{swin}. Self-supervised vision backbones such as DINO, DINOv2, and DINOv3 learn general visual representations from large unlabeled corpora \cite{dino,dinov2,dinov3}. We evaluate such backbones in both image-level and MIL settings, focusing on whether they help under background-dominant sparse aggregation.
+
+\subsection{Sparse and Efficient Instance Selection}
+Recent MIL literature has increasingly questioned whether all extracted instances should be processed by the aggregator. PAMIL introduces dynamic policy-driven instance sampling for whole-slide classification and explicitly treats sampling as part of the learning problem \cite{pamil}. MHIM-MIL masks salient easy instances to encourage discovery of harder useful instances \cite{mhim}. ACMIL analyzes attention concentration and shows that a tiny number of instances can dominate attention, motivating mechanisms that suppress over-concentration \cite{acmil}. Key Patches Are All You Need reports that using only a subset of regions can preserve in-domain diagnostic performance and improve robustness to shifts \cite{keypatches}. HDMIL further targets fast and accurate gigapixel classification by eliminating irrelevant patches \cite{hdmil}.
+
+These studies are mostly from computational pathology, not tree species recognition. Nevertheless, they are methodologically important because they address the same weak-label, many-instance, high-redundancy regime. Our contribution differs by moving sparse MIL to mid-range tree images and by using an application-specific trunk prior and training-only depth augmentation rather than learned pathology-specific relevance modules.
+
+\subsection{Depth-Guided Learning}
+Monocular depth estimation models such as MiDaS and Depth Anything V2 infer scene structure from RGB images \cite{midas,depthanythingv2}. Depth can be used not only as an inference-time modality but also as a training-time structural signal. For example, DepthG uses depth-guided feature correlation and sampling for unsupervised segmentation while not necessarily requiring depth at inference \cite{depthg}. Our DepthAug strategy follows this training-only principle: depth-derived foreground masks are used to perturb backgrounds during training, but deployed classifiers remain RGB-only.
 
 \section{Method}
 \label{sec:method}
 
-\subsection{Overview of the Method}
-This study focuses on the effect of incorporating depth information at different stages and compares four model configurations, including those without depth usage. Depth maps are estimated and optionally employed either as auxiliary input signals or as attention guidance during learning. The common framework is shown in Fig.~\ref{fig:framework}. In all cases, depth information is used only during training, while inference is performed solely with RGB images. Although depth maps can theoretically be employed as additional inputs, they are often unavailable or unreliable in real-world settings. Therefore, this study adopts a training-only strategy that leverages depth as structural supervision, improving generalizability and practical usability by eliminating dependence on depth estimation during inference.
+\subsection{Overview}
+The proposed framework converts a mid-range tree image into a sparse bag of structurally informative patches, extracts patch features with a visual backbone, and aggregates them with ABMIL. Depth-guided augmentation is applied during training to reduce dependence on background context. Fig.~\ref{fig:framework} illustrates the overall process.
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig04_framework.png}
-\caption{Overview of the proposed classification framework based on ViT and MIL. The configuration without depth usage corresponds to ViT + MIL. Two depth-guided extensions are also considered: Depth-guided Augmentation and Depth-guided Attention. Both approaches use depth information only during training.}
+\includegraphics[width=\textwidth]{figures/fig04_framework_current.png}
+\caption{Overview of the sparse MIL framework. The current main line uses RGB patches at inference, trunk-biased sparse sampling, ABMIL aggregation, and training-only depth-guided augmentation.}
 \label{fig:framework}
 \end{figure*}
 
-The four configurations are summarized as follows.
-\begin{enumerate}
-\item \textbf{Baseline:} the input image is directly fed to ResNet18 \cite{b12}, ViT \cite{b1}, or DINO-pretrained ViT \cite{b13}, and classification is performed with either global average pooling (GAP) or ABMIL. No depth information is used.
-\item \textbf{ViT + MIL:} ViT is combined with MIL to process images at the patch level and automatically extract informative regions such as trunks, branches, and leaves.
-\item \textbf{Depth-guided Augmentation:} depth maps are used to preserve near-field regions while varying far-field regions at the input stage, so the model implicitly learns to focus on the foreground.
-\item \textbf{Depth-guided Attention:} depth maps are incorporated into the attention computation to suppress distant background regions and emphasize near-field structures.
-\end{enumerate}
+\subsection{Image-to-Bag Construction}
+Given an input image $x$, candidate patches are generated with a sliding window. Let $\mathcal{C}(x)=\{q_1,\ldots,q_M\}$ denote the candidate patch set. A sparse bag $\mathcal{B}(x)$ is selected from $\mathcal{C}(x)$ according to a bag ratio $\rho \in (0,1]$, so that approximately $K=\lfloor \rho M \rfloor$ patches are processed by the MIL model. Unlike a fixed patch count, the ratio-based definition preserves a comparable fraction of available local evidence across images with different effective resolutions.
 
-\subsection{Classification Using ViT + ABMIL}
-Given an input image $x$, the image is divided into $N$ patches of size $P \times P$, and each patch $p_i$ is mapped into a feature space through the ViT embedding function $\phi(\cdot)$:
+\subsection{Trunk-Biased Sampling}
+TBS prioritizes candidate patches that are likely to contain high-frequency tree structures such as bark edges, trunk boundaries, and branch contours. For each candidate patch $q$, a Sobel score is computed as
 \begin{equation}
-z_i = \phi(p_i) \in \mathbb{R}^{d}, \qquad i=1,\ldots,N.
+S_{\mathrm{sobel}}(q)=\frac{1}{|q|}\sum_{u \in q}\|\nabla I(u)\|_2,
+\label{eq:sobel}
+\end{equation}
+where $I$ is the image intensity and $u$ indexes pixels in the patch. Candidate patches are ranked by $S_{\mathrm{sobel}}$. A trunk-bias parameter $\beta$ controls how strongly the sampler favors high-score patches. In the paper-facing setting, we use sliding candidates, $\beta=0.5$, a candidate multiplier of 4.0, and a stride of 160 pixels.
+
+This selection is intentionally simple and deterministic. It is not intended to segment the trunk exactly; rather, it shifts the sparse bag toward structurally informative regions while retaining enough diversity for ABMIL to learn which patches are useful.
+
+\subsection{Patch Feature Extraction and ABMIL}
+Each selected patch $p_i \in \mathcal{B}(x)$ is encoded by a backbone feature extractor $\phi(\cdot)$:
+\begin{equation}
+z_i=\phi(p_i)\in\mathbb{R}^{d}, \qquad i=1,\ldots,K.
 \label{eq:patch_embedding}
 \end{equation}
-The resulting feature set $Z = [z_1,\ldots,z_N]$ is processed by ABMIL using the attention score
+The ABMIL attention score is
 \begin{equation}
-e_i = w^{\top} \tanh(W z_i + b),
+e_i=w^{\top}\tanh(Wz_i+b),
 \label{eq:mil_score}
 \end{equation}
-followed by temperature-scaled normalization,
+and the normalized attention weight is
 \begin{equation}
-a_i = \frac{\exp(e_i / \tau)}{\sum_{j=1}^{N} \exp(e_j / \tau)},
+a_i=\frac{\exp(e_i)}{\sum_{j=1}^{K}\exp(e_j)}.
 \label{eq:mil_attention}
 \end{equation}
-where $W$, $w$, and $b$ are learnable parameters and $\tau$ controls the sharpness of the attention distribution. In this study, the standard softmax can be replaced by entmax or top-$k$ normalization to obtain sparse attention and emphasize salient local regions.
-
-The bag-level representation is given by
+The bag representation is computed as
 \begin{equation}
-s = \sum_{i=1}^{N} a_i z_i,
+s=\sum_{i=1}^{K} a_i z_i,
 \label{eq:bag_representation}
 \end{equation}
-and class probabilities are computed as
+and class probabilities are produced by a linear classifier followed by softmax:
 \begin{equation}
-p(y=c\mid x) = \mathrm{softmax}(W_c s + b_c).
+p(y=c\mid x)=\mathrm{softmax}(W_c s+b_c).
 \label{eq:classification}
 \end{equation}
-The classification loss is the cross-entropy
+Training minimizes cross-entropy with balanced elastic-net regularization on the attention distribution:
 \begin{equation}
-L_{\mathrm{cls}} = -\sum_{c} y_c \log p(y=c\mid x).
-\label{eq:cross_entropy}
+\mathcal{L}=\mathcal{L}_{\mathrm{CE}}+\lambda_1\|a\|_1+\lambda_2\|a\|_2^2.
+\label{eq:loss}
 \end{equation}
-This formulation allows ABMIL to selectively emphasize important regions within ViT-extracted patch features, enabling the model to focus on structural information such as trunks and branches while reducing reliance on background cues.
-
-To prioritize highly textured regions such as tree trunks and bark, a trunk-biased sampling strategy is introduced in the ABMIL instance-generation process. For a candidate patch set $\mathcal{C}$ produced by a sliding window, a texture score $S(q)$ is computed for each patch $q \in \mathcal{C}$ using one of the following indicators:
-\begin{align}
-S_{\mathrm{lapvar}}(q) &= \mathrm{Var}[\mathrm{Laplacian}(q)],
-\label{eq:lapvar}\\
-S_{\mathrm{sobel}}(q) &= \mathbb{E}[\lVert \nabla q \rVert_2],
-\label{eq:sobel}\\
-S_{\mathrm{hpf}}(q) &= \mathbb{E}[(\mathrm{HPF}(q))^2].
-\label{eq:hpf}
-\end{align}
-The default metric is Laplacian variance. Patches are sorted in descending order of $S(q)$, and the top $\lfloor K\beta \rfloor$ patches are deterministically selected, where $\beta$ denotes the trunk-bias ratio. The remaining $K-\lfloor K\beta \rfloor$ patches are sampled uniformly from the rest to preserve bag diversity. During training, this trunk-biased sliding sampler is alternated with random sampling in mixed mode to balance structural emphasis and diversity.
-
-The final loss combines the bag-level classification loss with regularization terms controlling sparsity and smoothness of the attention distribution:
-\begin{equation}
-L = L_{\mathrm{cls}} + \lambda_{\mathrm{ent}} H(A) + \lambda_{1} \lVert A \rVert_{1},
-\label{eq:regularized_loss}
-\end{equation}
-where
-\begin{equation}
-H(A) = -\sum_i A_i \log(A_i + \varepsilon).
-\label{eq:entropy}
-\end{equation}
-The entropy term suppresses excessive concentration, while the $L_1$ term promotes sparsity and encourages the model to focus on a limited number of informative patches.
+In the main protocol, $\lambda_1=\lambda_2=5\times 10^{-4}$ and entropy regularization is disabled.
 
 \subsection{Depth-Guided Augmentation}
-During training, depth-guided augmentation is probabilistically applied using relative depth maps estimated by MiDaS \cite{b3}. Foreground regions corresponding to trunks and branches are preserved, while background regions are replaced or degraded using external natural images. Boundary transitions are smoothed through morphological operations and feathering, and standard photometric augmentations such as blur, color transformation, and JPEG compression are applied to expand variation in background and illumination conditions. This approach aims to prevent overfitting to background diversity inherent in mid-range tree images and to guide model attention consistently toward intrinsic structures. The augmentation is applied only to training data; validation and test data remain unchanged.
+DepthAug uses pseudo-depth maps estimated from RGB images to construct training images in which foreground tree structures are preserved and background regions are perturbed. The purpose is not to add depth as an inference-time modality, but to weaken label-correlated background shortcuts during learning.
 
-\subsection{Depth-Guided Attention}
-In the Depth-guided Attention model, depth information is incorporated directly into attention computation. Depth guidance is active only during training, whereas inference uses standard MIL-based attention without depth input. Let $D_i$ denote the mean normalized depth value of patch $i$ in the range $[0,1]$. The depth weighting function is defined as
+Let $D(x)$ be a normalized relative depth map and $m(x)$ a foreground mask derived from $D(x)$ by thresholding and morphological smoothing. A depth-augmented training image is formed as
 \begin{equation}
-g(D_i) =
-\begin{cases}
-1, & D_i \le t,\\
-\exp\{-\gamma(D_i-t)\}, & D_i > t,
-\end{cases}
-\label{eq:depth_weight}
+\tilde{x}=m(x)\odot x + (1-m(x))\odot T(x,r),
+\label{eq:depth_aug}
 \end{equation}
-where $t$ is the threshold and $\gamma$ controls the decay rate. This prior assigns higher weights to near-field trunk regions and exponentially suppresses distant background contributions.
+where $T(\cdot)$ applies background perturbations such as blur, color transformation, compression, or replacement with an external natural scene $r$. Validation and test images are not augmented in this way. At inference, the model receives only RGB images and uses the same TBS and ABMIL pipeline.
 
-At the score level, depth is integrated by late fusion,
-\begin{equation}
-e_i \leftarrow e_i + \eta \log(g_i + \varepsilon),
-\label{eq:late_fusion}
-\end{equation}
-where $\eta$ is the fusion strength. After attention normalization, a geometric-mean fusion variant is also considered:
-\begin{equation}
-\tilde{A}_i = \frac{A_i^{1-\lambda} g_i^{\lambda}}{\sum_j A_j^{1-\lambda} g_j^{\lambda}},
-\label{eq:geometric_fusion}
-\end{equation}
-where $\lambda$ controls the contribution of depth. This formulation preserves the learned attention structure while enhancing emphasis on near-field trunk regions.
+\section{Experimental Setup}
+\label{sec:experiments}
 
-\section{Datasets}
-\label{sec:datasets}
-
-This study uses two datasets: a dataset independently collected in Japan (FruitsPark) and a publicly available urban tree dataset (UrbanStreetTree).
-
-\subsection{FruitsPark Dataset}
-The FruitsPark dataset was independently collected at a public fruit park in Japan between June 2024 and May 2025 as part of a field survey conducted in a designated experimental area. It consists of images from ten tree classes. Images were captured using an iPhone 15 Pro and a Pixel 7 Pro and unified to a resolution of $1080 \times 1920$ pixels. The dataset covers all four seasons and includes diverse backgrounds such as soil, other trees, playground equipment, and signboards within the park. To prevent data leakage between training and validation, samples were divided by individual trees and collection periods. Sample images are shown in Fig.~\ref{fig:fruitspark_samples}.
+\subsection{Datasets}
+We evaluate on two datasets. FruitsPark is an in-house dataset collected at a public fruit park in Japan using mobile devices. It contains 790 original images from 10 tree classes and uses a train/validation split; because no independent test set is available, the validation split is used as the final evaluation split. UrbanStreetTree is a public street-tree dataset collected in Chinese cities \cite{urbanstreettree}. We use the branch subset prepared for this study, containing 1,485 images from 13 classes with train, validation, and test splits. Representative images are shown in Figs.~\ref{fig:fruitspark_samples} and \ref{fig:urbanstreettree_samples}.
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig05_fruitspark.png}
-\caption{Sample images from the FruitsPark dataset.}
+\caption{Sample images from FruitsPark. The dataset contains seasonal and background variation within a park environment.}
 \label{fig:fruitspark_samples}
 \end{figure*}
-
-\subsection{UrbanStreetTree Dataset}
-The UrbanStreetTree dataset (Branch subset) consists of urban street tree images collected across ten cities in China \cite{b11}. Images were captured using multiple devices at a resolution of $3008 \times 3970$ pixels. Because the dataset includes mid-range images with people, vehicles, and buildings in the background, it is well suited for evaluating classification performance in complex urban environments. Sample images are shown in Fig.~\ref{fig:urbanstreettree_samples}.
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig06_urbanstreettree.png}
-\caption{Sample images from the UrbanStreetTree dataset \cite{b11}.}
+\caption{Sample images from UrbanStreetTree \cite{urbanstreettree}. Street scenes contain complex backgrounds such as roads, buildings, vehicles, and neighboring trees.}
 \label{fig:urbanstreettree_samples}
 \end{figure*}
 
-\subsection{Data Augmentation and Dataset Comparison}
-During training, two augmentation policies are considered.
-\begin{enumerate}
-\item \textbf{Standard photometric augmentation:} random brightness and contrast adjustment ($\pm 0.2$), hue-saturation-value transformation, motion blur (3--5 pixels), resizing to $224 \times 224$, and ImageNet normalization.
-\item \textbf{Depth-based background replacement:} foreground tree regions are preserved, while background regions are replaced with external natural scenes according to the estimated depth map. Morphological operations and feathering are used to maintain smooth boundaries.
-\end{enumerate}
-Representative images generated by the depth-guided augmentation process are shown in Fig.~\ref{fig:depth_aug_samples}.
-
-\begin{figure*}[t]
+\begin{table}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig07_depth_aug.png}
-\caption{Sample images generated by depth-guided augmentation.}
-\label{fig:depth_aug_samples}
-\end{figure*}
-
-Table~\ref{tab:depth_aug_config} summarizes the detailed augmentation settings. Tables~\ref{tab:data_split} and \ref{tab:dataset_compare} summarize the dataset split and dataset characteristics used throughout the experiments.
-
-\begin{table*}[t]
-\centering
-\caption{Configuration of depth-guided background replacement augmentation.}
-\label{tab:depth_aug_config}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{p{5.2cm}p{8.8cm}c}
-\toprule
-Processing step & Description / setting & Probability \\
-\midrule
-Depth estimation and foreground extraction & Depth estimated using MiDaS (DPT-Hybrid); the foreground tree region is extracted and only the largest connected component is retained. & 100\% \\
-Background replacement & Background is replaced with natural scenes from the Places365 dataset, with depth matching enabled. & 80\% \\
-Mask processing & Erosion: 5 px; dilation: 3 px; feathering: 13 px. & 100\% \\
-Blur effect & Gaussian blur with strength 3--10. & 90\% \\
-Color transformation & Brightness, contrast, and saturation scaled by 0.65--1.35; hue shifted by $\pm 0.10$. & 55\% \\
-JPEG compression & JPEG compression with quality 16--50. & 70\% \\
-\bottomrule
-\end{tabular}}
-\end{table*}
-
-\begin{table*}[t]
-\centering
-\caption{Data splits before and after augmentation.}
-\label{tab:data_split}
-\resizebox{0.75\textwidth}{!}{%
-\begin{tabular}{lccc}
-\toprule
-Dataset & Train & Validation & Test \\
-\midrule
-FruitsPark (original) & 580 & 210 & 0 \\
-FruitsPark (augmented) & 2,273 & 210 & 0 \\
-UrbanStreetTree (original) & 1,193 & 149 & 143 \\
-UrbanStreetTree (augmented) & 4,674 & 149 & 143 \\
-\bottomrule
-\end{tabular}}
-\end{table*}
-
-\begin{table*}[t]
-\centering
-\caption{Comparison of the datasets used in this study.}
-\label{tab:dataset_compare}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{p{3.2cm}p{5.2cm}p{6.0cm}}
+\caption{Dataset summary used in this study.}
+\label{tab:dataset_summary}
+\begin{tabular}{lcc}
 \toprule
 Item & FruitsPark & UrbanStreetTree \\
 \midrule
-Number of classes & 10 & 13 \\
-Number of images & 790 & 1,485 \\
-Number of images (augmented) & 2,483 & 4,966 \\
-Data split & Training and validation (no test set) & Training, validation, and test \\
-Image resolution & $1080 \times 1920$ px & $3008 \times 3970$ px \\
-Aspect ratio & 0.562 & 0.760 \\
-Class distribution & Uniform (246--251 images per class, $\pm 3$) & Diverse (minimum 299, maximum 581 per class) \\
-Shooting conditions & Inside a park, 3--5 m distance; multiple seasons and times; backgrounds include playgrounds and signboards & Urban streets, 0.1--3 m distance; multiple seasons and cities; backgrounds include people, vehicles, and buildings \\
-Capture devices & iPhone 15 Pro and Pixel 7 Pro & Multiple mobile devices \\
+Classes & 10 & 13 \\
+Original images & 790 & 1,485 \\
+Train / val / test & 580 / 210 / 0 & 1,193 / 149 / 143 \\
+Augmented train images & 2,273 & 4,674 \\
+Final evaluation split & Validation & Test \\
 \bottomrule
-\end{tabular}}
-\end{table*}
+\end{tabular}
+\end{table}
+
+\subsection{Compared Models}
+The overall comparison includes three groups. First, image-level GAP baselines use ResNet18 \cite{resnet}, ViT \cite{vit}, DINO/DINOv2/DINOv3 ViT backbones \cite{dino,dinov2,dinov3}, and Swin Transformer \cite{swin}. These baselines use trainable backbones. Second, sparse MIL models use frozen backbones and TBS with $\rho=0.3$. Third, sparse DepthAug models use the same sparse MIL setting but train on depth-augmented datasets constructed from the \texttt{only\_blur/aug\_midas\_large} variants. All reported results use four seeds: 0042, 2024, 2025, and 3407.
+
+The Pareto efficiency experiment fixes the backbone to DINOv2 and the model family to TBS sparse MIL with DepthAug, then sweeps $\rho \in \{0.1,0.2,\ldots,1.0\}$ over four seeds. We report accuracy, macro-$F_1$, and average instances per bag. Patch instances are a direct proxy for encoder workload; wall-clock latency should be measured separately before making deployment-specific timing claims.
+
+We also include two sparse-selection checks. First, a fixed-budget condition ablation compares full training/full evaluation, full training/sparse evaluation, random sparse training/evaluation, TBS sparse training/evaluation, and TBS sparse training with DepthAug followed by sparse RGB evaluation. Second, a ratio-wise comparison evaluates the proposed TBS-DepthAug configuration against random sparse sampling at the same bag ratios. These analyses are used to determine whether the proposed sampling and augmentation strategy improves over patch-count reduction alone.
+
+\subsection{Implementation Details}
+All models are trained for 30 epochs. GAP baselines use batch size 32, whereas MIL models use batch size 1 because each image is represented as a patch bag. Dataset-specific normalization is computed from the training split. Sparse MIL and DepthAug models use softmax ABMIL attention, Sobel TBS scoring, $\lambda_1=\lambda_2=5\times10^{-4}$, no entropy regularization, and automatic mixed precision. The experiments were run on a workstation with NVIDIA RTX A6000 GPUs, CUDA 12.9, an AMD Ryzen Threadripper 7960X CPU, and 62 GiB system memory.
 
 \section{Results}
 \label{sec:results}
 
-\subsection{Models and Comparative Methods}
-The effectiveness of depth guidance was evaluated with Transformer-based models as the primary focus. The base models were ResNet18 \cite{b12}, ViT \cite{b1}, and Swin Transformer \cite{b14}. For ViT, the study additionally used a DINO-pretrained model initialized with weights learned on ImageNet-1K \cite{b13}. In total, 16 configurations were compared: ResNet18 with GAP or MIL, ViT and DINO-ViT with GAP or MIL, depth-guided variants, and Swin Transformer with MIL.
-
-\subsection{Evaluation Metrics}
-Classification performance was evaluated with accuracy and micro-averaged $F_1$ score on the test dataset. If no separate test set was available, the validation dataset was used instead. Attention maps were also visualized to qualitatively analyze how depth guidance altered attention distributions.
-
-Accuracy is defined as
-\begin{equation}
-\mathrm{Accuracy} = \frac{1}{N} \sum_{i=1}^{N} \mathbf{1}(\hat{y}_i = y_i),
-\label{eq:accuracy}
-\end{equation}
-where $N$ is the total number of samples, $y_i$ is the ground-truth label, and $\hat{y}_i$ is the predicted label. The micro-$F_1$ score is computed as
-\begin{equation}
-\mathrm{Micro\mbox{-}F_1} = \frac{2\,TP}{2\,TP + FP + FN}.
-\label{eq:microf1}
-\end{equation}
-
-\subsection{Overall Results}
-Table~\ref{tab:main_results} summarizes the classification results on FruitsPark and UrbanStreetTree. Overall, Transformer-based models significantly outperformed ResNet-based models, and the depth-guided variants achieved the best results on both datasets.
+\subsection{Overall Comparison}
+Table~\ref{tab:overall_results} reports the complete four-seed results for the fixed-budget backbone comparison. On UrbanStreetTree, sparse MIL improves over image-level ViT GAP, and DepthAug provides a further gain. ViT DepthAug achieves the best mean result in this fixed-budget comparison, 95.10\% accuracy and 94.27\% macro-$F_1$. DINOv2 DepthAug is close, with 94.93\% accuracy and 94.13\% macro-$F_1$. On FruitsPark, the strongest image-level models remain highly competitive; DINOv3 GAP reaches 97.62\% accuracy and 97.60\% macro-$F_1$. The best sparse DepthAug model on FruitsPark is DINOv2 DepthAug, with 93.81\% accuracy and 93.87\% macro-$F_1$.
 
 \begin{table*}[t]
 \centering
-\caption{Classification results on UrbanStreetTree and FruitsPark.}
-\label{tab:main_results}
+\caption{Complete four-seed results for all configurations. Values are mean $\pm$ standard deviation in percent. FruitsPark is evaluated on validation; UrbanStreetTree is evaluated on test. Colored arrows show the change in percentage points relative to the Image-level GAP baseline of the same backbone: blue upward arrows indicate gains and red downward arrows indicate losses.}
+\label{tab:overall_results}
+\scriptsize
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{clcccc}
+\begin{tabular}{llcccc}
 \toprule
-\multirow{2}{*}{Category} & \multirow{2}{*}{Method} & \multicolumn{2}{c}{UrbanStreetTree} & \multicolumn{2}{c}{FruitsPark} \\
+Group & Model & \multicolumn{2}{c}{FruitsPark} & \multicolumn{2}{c}{UrbanStreetTree} \\
 \cmidrule(lr){3-4}\cmidrule(lr){5-6}
- &  & Accuracy (\%) & Micro-$F_1$ (\%) & Accuracy (\%) & Micro-$F_1$ (\%) \\
+ & & Accuracy & Macro-$F_1$ & Accuracy & Macro-$F_1$ \\
 \midrule
-\multirow{4}{*}{Baseline} 
-& ResNet18 + GAP & 87.25 & 82.52 & 90.00 & 90.00 \\
-& ResNet18 + MIL & 64.00 & 64.34 & 61.90 & 61.90 \\
-& ViT + GAP & 79.20 & 74.80 & 89.00 & 88.30 \\
-& ViT (DINO) + GAP & 66.43 & 62.00 & 78.09 & 78.00 \\
+Image-level & ResNet18 GAP & $93.93 \pm 1.96$ & $93.85 \pm 2.10$ & $83.92 \pm 3.28$ & $81.40 \pm 3.95$ \\
+Image-level+Aug & ResNet18 GAP Aug & $92.14 \pm 2.59$ \loss{1.79} & $92.01 \pm 2.72$ \loss{1.84} & $83.57 \pm 2.32$ \loss{0.35} & $81.55 \pm 1.61$ \gain{0.16} \\
+Sparse MIL & ResNet18 MIL & $35.36 \pm 2.84$ \loss{58.57} & $33.97 \pm 3.14$ \loss{59.88} & $9.79 \pm 5.62$ \loss{74.13} & $6.96 \pm 3.26$ \loss{74.44} \\
 \midrule
-\multirow{3}{*}{ViT + MIL}
-& ViT + MIL & 90.91 & 88.66 & 86.19 & 86.05 \\
-& ViT (DINO) + MIL & 80.00 & 80.00 & 74.82 & 70.00 \\
-& Swin + MIL & 74.50 & 73.27 & 87.62 & 86.98 \\
+Image-level & ViT GAP & $95.12 \pm 1.57$ & $95.05 \pm 1.62$ & $84.62 \pm 2.74$ & $81.77 \pm 3.12$ \\
+Image-level+Aug & ViT GAP Aug & $94.76 \pm 1.23$ \loss{0.36} & $94.65 \pm 1.44$ \loss{0.41} & $84.97 \pm 3.81$ \gain{0.35} & $82.11 \pm 4.22$ \gain{0.34} \\
+Sparse MIL & ViT MIL & $86.67 \pm 1.60$ \loss{8.45} & $86.42 \pm 1.58$ \loss{8.63} & $91.61 \pm 1.28$ \gain{6.99} & $90.53 \pm 1.78$ \gain{8.76} \\
+Sparse DepthAug & ViT DepthAug & $88.21 \pm 2.18$ \loss{6.90} & $88.24 \pm 2.21$ \loss{6.81} & $\mathbf{95.10 \pm 1.81}$ \gain{10.49} & $\mathbf{94.27 \pm 2.37}$ \gain{12.50} \\
 \midrule
-\multirow{3}{*}{Depth Augmentation}
-& ViT + MIL & 94.41 & 93.84 & 95.24 & 95.16 \\
-& ViT (DINO) + MIL & 97.90 & 97.76 & 91.90 & 91.89 \\
-& Swin + MIL & 90.21 & 87.49 & 85.24 & 80.16 \\
+Image-level & DINOv1 GAP & $60.24 \pm 3.12$ & $59.49 \pm 3.16$ & $57.17 \pm 8.22$ & $54.51 \pm 8.23$ \\
+Image-level+Aug & DINOv1 GAP Aug & $49.29 \pm 10.08$ \loss{10.95} & $47.34 \pm 9.99$ \loss{12.15} & $49.30 \pm 7.28$ \loss{7.87} & $45.33 \pm 6.83$ \loss{9.18} \\
+Sparse MIL & DINOv1 MIL & $90.71 \pm 0.91$ \gain{30.48} & $90.55 \pm 1.13$ \gain{31.05} & $92.83 \pm 3.49$ \gain{35.66} & $91.16 \pm 4.52$ \gain{36.65} \\
+Sparse DepthAug & DINOv1 DepthAug & $88.57 \pm 0.87$ \gain{28.33} & $88.37 \pm 0.95$ \gain{28.88} & $94.06 \pm 1.46$ \gain{36.89} & $92.87 \pm 1.73$ \gain{38.36} \\
 \midrule
-\multirow{6}{*}{Depth-guided Attention}
-& ViT + MIL & 91.61 & 90.23 & 90.48 & 90.37 \\
-& ViT (DINO) + MIL & 93.71 & 92.64 & 91.90 & 91.72 \\
-& ViT + MIL + Late Fusion & 90.91 & 89.24 & 85.24 & 84.84 \\
-& ViT (DINO) + MIL + Late Fusion & 91.61 & 89.20 & 90.48 & 90.14 \\
-& ViT + MIL + Piecewise Depth & 93.01 & 90.91 & 88.57 & 88.52 \\
-& ViT (DINO) + MIL + Piecewise Depth & 93.71 & 92.82 & 88.57 & 88.41 \\
+Image-level & DINOv2 GAP & $41.31 \pm 3.70$ & $39.50 \pm 4.28$ & $45.45 \pm 3.33$ & $42.58 \pm 3.22$ \\
+Image-level+Aug & DINOv2 GAP Aug & $41.67 \pm 0.99$ \gain{0.36} & $41.34 \pm 1.35$ \gain{1.84} & $43.71 \pm 3.26$ \loss{1.75} & $40.59 \pm 3.14$ \loss{1.99} \\
+Sparse MIL & DINOv2 MIL & $92.50 \pm 1.67$ \gain{51.19} & $92.52 \pm 1.66$ \gain{53.02} & $92.13 \pm 2.16$ \gain{46.68} & $90.54 \pm 2.65$ \gain{47.96} \\
+Sparse DepthAug & DINOv2 DepthAug & $93.81 \pm 2.37$ \gain{52.50} & $93.87 \pm 2.39$ \gain{54.37} & $94.93 \pm 2.31$ \gain{49.48} & $94.13 \pm 2.74$ \gain{51.55} \\
+\midrule
+Image-level & DINOv3 GAP & $\mathbf{97.62 \pm 1.03}$ & $\mathbf{97.60 \pm 1.04}$ & $86.71 \pm 0.99$ & $84.67 \pm 0.89$ \\
+Image-level+Aug & DINOv3 GAP Aug & $95.24 \pm 1.23$ \loss{2.38} & $95.25 \pm 1.26$ \loss{2.34} & $87.94 \pm 2.01$ \gain{1.22} & $86.88 \pm 1.73$ \gain{2.21} \\
+Sparse MIL & DINOv3 MIL & $83.33 \pm 2.06$ \loss{14.29} & $83.15 \pm 2.06$ \loss{14.45} & $88.46 \pm 1.85$ \gain{1.75} & $87.76 \pm 1.84$ \gain{3.09} \\
+Sparse DepthAug & DINOv3 DepthAug & $86.55 \pm 0.81$ \loss{11.07} & $86.54 \pm 0.77$ \loss{11.06} & $91.26 \pm 1.46$ \gain{4.55} & $90.33 \pm 1.27$ \gain{5.66} \\
+\midrule
+Image-level & Swin GAP & $97.14 \pm 1.69$ & $97.09 \pm 1.74$ & $89.34 \pm 0.67$ & $87.10 \pm 1.22$ \\
+Image-level+Aug & Swin GAP Aug & $95.12 \pm 1.06$ \loss{2.02} & $95.09 \pm 1.04$ \loss{2.00} & $87.76 \pm 3.54$ \loss{1.57} & $86.57 \pm 3.64$ \loss{0.53} \\
+Sparse MIL & Swin MIL & $80.60 \pm 2.73$ \loss{16.55} & $80.51 \pm 2.64$ \loss{16.58} & $89.69 \pm 1.93$ \gain{0.35} & $87.61 \pm 2.22$ \gain{0.51} \\
+Sparse DepthAug & Swin DepthAug & $84.40 \pm 0.81$ \loss{12.74} & $84.31 \pm 0.90$ \loss{12.78} & $93.18 \pm 1.55$ \gain{3.85} & $91.89 \pm 2.08$ \gain{4.79} \\
 \bottomrule
 \end{tabular}}
 \end{table*}
 
-\subsection{Baseline Comparison}
-ResNet18 with simple GAP achieved high accuracy---87.25\% on UrbanStreetTree and 90.00\% on FruitsPark---but showed signs of overfitting to training data. When the MIL structure was introduced, performance dropped substantially: ResNet18 + MIL achieved only 64.00\% on UrbanStreetTree and 61.90\% on FruitsPark. For ViT, the GAP configuration yielded slightly lower accuracy than ResNet18. However, when MIL was combined with ViT, accuracy improved to 90.91\% on UrbanStreetTree and 86.19\% on FruitsPark, indicating that multi-region aggregation contributed positively to performance.
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig15_overall_comparison_selected.png}
+\caption{Representative four-seed macro-$F_1$ comparison. Gray bars indicate image-level GAP baselines, blue bars indicate sparse MIL, and orange bars indicate sparse MIL with DepthAug.}
+\label{fig:overall_rank}
+\end{figure*}
 
-\subsection{Effect of DINO Pretraining}
-When the self-supervised DINO-pretrained ViT was used, accuracy decreased significantly in the GAP configuration. Compared with the standard ViT baseline, DINO-ViT dropped by 12.77 points on UrbanStreetTree and 10.91 points on FruitsPark. A similar trend appeared in the MIL configuration. However, in settings that incorporated depth information, DINO-based models consistently improved performance on several tasks. This suggests that DINO's global representation becomes more useful when constrained by depth guidance.
+\subsection{Effect of Depth-Guided Augmentation}
+DepthAug is most effective on UrbanStreetTree. Relative to the corresponding sparse MIL model, paired-seed macro-$F_1$ improvements are +3.74 percentage points for ViT, +3.59 for DINOv2, +2.57 for DINOv3, and +4.28 for Swin. This supports the interpretation that training-time background perturbation is useful in street scenes where background shortcuts are severe.
 
-\subsection{Effect of Depth Guidance}
-Depth-based augmentation produced the strongest improvements overall. ViT (DINO) + MIL + Depth Augmentation achieved 97.90\% on UrbanStreetTree, while ViT + MIL + Depth Augmentation achieved 95.24\% on FruitsPark. Regardless of DINO pretraining, depth-guided augmentation proved effective across both datasets. All depth-guided models outperformed their corresponding baselines on UrbanStreetTree. On FruitsPark, more than half of the depth-guided models improved upon their reference baselines, although the degree of improvement varied with environmental conditions.
-
-\subsection{Effects of Late Fusion and Piecewise Depth}
-Late Fusion generally yielded lower accuracies than the corresponding depth-guided attention models without post-processing, suggesting that direct logarithmic addition of depth weights does not stabilize the attention distribution. Piecewise Depth provided small improvements on UrbanStreetTree but reduced stability on FruitsPark. Overall, the experimental results suggest that Late Fusion tends to degrade performance, whereas Piecewise Depth has dataset-dependent effects.
-
-\subsection{Qualitative Evaluation}
-Attention maps were used to examine whether the proposed framework actually focused on the target tree rather than the background. In the baseline ResNet + GAP model, strong attention frequently fell on buildings, roads, unrelated trees, and poles. ViT + MIL still exhibited broadly distributed attention over background elements. In contrast, the depth-guided models concentrated attention on foreground structures such as trunks, branches, and leaves while reducing dispersion to the background. This trend was consistent across both datasets.
+On FruitsPark, the effect is mixed. DINOv2 and ViT gain from DepthAug, but DINOv1 and DINOv3 do not. This difference is important for interpretation: FruitsPark is a validation-only dataset collected in a specific park environment, and strong image-level foundation models may benefit from stable domain regularities. We therefore use FruitsPark as a secondary validation of the method's behavior rather than as the sole basis for a superiority claim.
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig08_resnet_gap_attention.png}
-\caption{Samples of attention maps for ResNet + GAP (Method 1).}
-\label{fig:attn_resnet}
+\includegraphics[width=\textwidth]{figures/fig16_depth_aug_delta_submission.png}
+\caption{DepthAug delta relative to corresponding sparse MIL models. The effect is consistently positive on UrbanStreetTree and dataset-dependent on FruitsPark.}
+\label{fig:depth_delta}
+\end{figure*}
+
+\subsection{Sparse-Selection Ablation}
+The fixed-budget condition ablation in Fig.~\ref{fig:condition_ablation} compares whether sparse inference alone is sufficient and whether TBS and DepthAug improve over random sparse training. On FruitsPark, full training and full evaluation reach 88.6\% accuracy in this protocol. Switching to full training with sparse evaluation reduces accuracy to 78.9\%, showing that reducing the evaluation budget alone is not sufficient. Random sparse training/evaluation reaches 76.3\%, TBS sparse training/evaluation reaches 78.2\%, and TBS sparse with DepthAug improves to 85.0\%. On UrbanStreetTree, full training/full evaluation reaches 94.2\%, while full training/sparse evaluation, random sparse, TBS sparse, and TBS sparse with DepthAug reach 90.4\%, 88.3\%, 89.7\%, and 91.3\%, respectively. Thus, at a fixed sparse budget, TBS gives a modest gain over random sparse sampling, and DepthAug provides the largest additional gain. Full-patch processing remains a strong reference, but the gap is substantially reduced by combining sparse selection with training-time background perturbation.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig18_condition_ablation.png}
+\caption{Fixed-budget condition ablation comparing full processing, sparse evaluation, random sparse training/evaluation, TBS sparse training/evaluation, and TBS sparse training with DepthAug.}
+\label{fig:condition_ablation}
+\end{figure*}
+
+\subsection{Pareto Efficiency of Sparse Patch Selection}
+Table~\ref{tab:pareto} summarizes the Pareto efficiency experiment. On FruitsPark, the best accuracy is obtained at $\rho=1.0$, with 96.79\% accuracy and 66.0 instances. The efficient point within one percentage point of the best result is $\rho=0.8$, which uses 53.0 instances and loses only 0.71 percentage points. On UrbanStreetTree, the best accuracy is obtained at $\rho=0.9$, with 96.33\% accuracy and 367.2 instances. The efficient point is $\rho=0.4$, which reaches 95.98\% accuracy and 95.22\% macro-$F_1$ with only 163.3 instances, losing 0.35 percentage points while using about 44.5\% of the instances used by the best-accuracy setting.
+
+\begin{table*}[t]
+\centering
+\caption{Pareto efficiency summary for TBS sparse MIL with DepthAug.}
+\label{tab:pareto}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llccccc}
+\toprule
+Dataset & Choice & Bag ratio & Accuracy (\%) & Macro-$F_1$ (\%) & Instances & Gap to best (pp) \\
+\midrule
+FruitsPark & Best accuracy & 1.0 & $96.79 \pm 1.57$ & 96.79 & 66.0 & 0.00 \\
+FruitsPark & Efficient within 1pp & 0.8 & $96.07 \pm 2.76$ & 96.01 & 53.0 & 0.71 \\
+UrbanStreetTree & Best accuracy & 0.9 & $96.33 \pm 1.84$ & 95.83 & 367.2 & 0.00 \\
+UrbanStreetTree & Efficient within 1pp & 0.4 & $95.98 \pm 0.88$ & 95.22 & 163.3 & 0.35 \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+Table~\ref{tab:random_compare} compares the proposed TBS-DepthAug ratio sweep with random sparse sampling. Random sparse sampling is a strong baseline and is sometimes more patch-efficient at a specific ratio, especially on FruitsPark. Nevertheless, the proposed method achieves the highest observed accuracy on both datasets. On UrbanStreetTree, the proposed efficient point reaches 95.98\% accuracy at $\rho=0.4$, compared with the best random sparse accuracy of 95.80\% at $\rho=0.3$. On FruitsPark, random sparse reaches 96.07\% accuracy with 40.0 patches at $\rho=0.6$, while the proposed method reaches a higher best accuracy of 96.79\% at $\rho=1.0$ and matches 96.07\% accuracy at its within-1pp efficient point.
+
+\begin{table*}[t]
+\centering
+\caption{Proposed TBS-DepthAug versus random sparse sampling in the ratio sweep.}
+\label{tab:random_compare}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llccccc}
+\toprule
+Dataset & Method & Point & Bag ratio & Patches & Accuracy (\%) & Macro-$F_1$ (\%) \\
+\midrule
+FruitsPark & Proposed & Best & 1.0 & 66.0 & 96.79 & 96.79 \\
+FruitsPark & Proposed & Within 1pp & 0.8 & 53.0 & 96.07 & 96.01 \\
+FruitsPark & Random & Best / Within 1pp & 0.6 & 40.0 & 96.07 & 96.05 \\
+UrbanStreetTree & Proposed & Best & 0.9 & 367.2 & 96.33 & 95.83 \\
+UrbanStreetTree & Proposed & Within 1pp & 0.4 & 163.3 & 95.98 & 95.22 \\
+UrbanStreetTree & Random & Best / Within 1pp & 0.3 & 122.7 & 95.80 & 95.08 \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig17_pareto_frontier_submission.png}
+\caption{Patch-budget Pareto frontier for TBS sparse MIL with DepthAug. Circles mark the best-accuracy settings and squares mark the efficient settings within one percentage point of the best accuracy.}
+\label{fig:pareto_overview}
 \end{figure*}
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig09_vit_mil_attention.png}
-\caption{Samples of attention maps for ViT + MIL (Method 5).}
-\label{fig:attn_vitmil}
+\includegraphics[width=\textwidth]{figures/fig19_random_vs_proposed_efficiency.png}
+\caption{Patch-efficiency curves comparing the proposed TBS-DepthAug configuration with random sparse sampling across bag ratios.}
+\label{fig:random_efficiency}
 \end{figure*}
 
-\begin{figure*}[t]
-\centering
-\includegraphics[width=\textwidth]{figures/fig10_vit_mil_depth_aug_attention.png}
-\caption{Samples of attention maps for ViT + MIL + Depth Augmentation (Method 8).}
-\label{fig:attn_depthaug}
-\end{figure*}
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=\textwidth]{figures/fig11_dino_depth_aug_attention.png}
-\caption{Samples of attention maps for ViT (DINO) + MIL + Depth Augmentation (Method 9).}
-\label{fig:attn_dino_depthaug}
-\end{figure*}
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=\textwidth]{figures/fig12_depth_attention.png}
-\caption{Samples of attention maps for ViT + MIL + Depth-guided Attention (Method 11).}
-\label{fig:attn_depthattention}
-\end{figure*}
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=\textwidth]{figures/fig13_latefusion_attention.png}
-\caption{Samples of attention maps for ViT + MIL + Depth-guided Attention + Late Fusion (Method 13).}
-\label{fig:attn_latefusion}
-\end{figure*}
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=\textwidth]{figures/fig14_piecewise_attention.png}
-\caption{Samples of attention maps for ViT + MIL + Depth-guided Attention + Piecewise Depth (Method 15).}
-\label{fig:attn_piecewise}
-\end{figure*}
+\subsection{Qualitative Attention Behavior}
+Attention visualizations can be useful diagnostics for checking whether high-weight patches correspond to trunks, branches, or background regions. However, attention weights should not be treated as causal explanations by themselves \cite{attentionnotexplanation}. For this reason, we use attention behavior only as supporting diagnostic evidence and base the main claims on the four-seed quantitative comparison and Pareto analysis. Selected-patch visualizations are most informative when generated from the exact TBS-DepthAug setting used in the quantitative experiments; visualizations from earlier internal variants are therefore not used as primary evidence.
 
 \section{Discussion}
 \label{sec:discussion}
 
-\subsection{Factors Contributing to Performance Improvement by Depth Guidance}
-Methods incorporating depth information---namely Depth-guided Attention and Depth-guided Augmentation---consistently achieved higher classification accuracy than ResNet18 and standard ViT. These results indicate that depth guidance suppresses the influence of background regions and directs attention toward foreground structures such as trunks, branches, and leaves. In particular, Depth-guided Augmentation enables simulation of diverse environmental conditions through background replacement, promoting robust feature learning that is less dependent on contextual background information. The qualitative visualization results support this interpretation because the depth-guided models exhibit stronger focus on the foreground.
+\subsection{Why Sparse MIL Helps}
+Mid-range tree classification requires the model to preserve fine local evidence while reasoning over the entire object structure. Standard image-level resizing can dilute trunk and bark information, especially when the tree occupies a small region. ABMIL avoids forcing the whole image into one global descriptor; it lets the model assign weights to local patches. TBS makes this practical by reducing the number of instances and biasing the bag toward structural patches before feature extraction. The random-comparison experiment also shows that random sparse sampling is not a weak baseline: patch-count reduction alone can be competitive at some ratios. The value of TBS-DepthAug is therefore not that it dominates random sampling at every patch budget, but that it improves the fixed sparse condition and produces higher best-accuracy points while retaining a practical sparse operating point.
 
-Although Depth-guided Attention showed smaller improvement margins than Depth-guided Augmentation, it maintained stable foreground focus during inference. This suggests that integrating depth directly into the model architecture, rather than relying solely on data augmentation, offers a generalizable and deployable strategy for real-world applications.
+\subsection{Why DepthAug Helps on UrbanStreetTree}
+UrbanStreetTree contains complex street backgrounds and an independent test split, making it a strong setting for evaluating background shortcut suppression. The consistent DepthAug gains across backbones suggest that perturbing depth-derived background regions during training prevents the classifier from relying on scene context alone. Importantly, DepthAug does not impose a depth sensor requirement at inference, which is essential for mobile and low-cost deployment.
 
-\subsection{Influence of DINO Pretraining}
-Self-supervised pretraining with DINO enables the model to learn global structural representations from large-scale natural images without label supervision \cite{b13}. However, DINO tends to prioritize global scene consistency over local object details. When applied to tree images where foreground and background are tightly entangled, attention often spreads across background areas. This explains the degraded performance observed in configurations without depth guidance. In contrast, when depth guidance was combined with DINO, performance improved in most settings. DINO's global representation captures holistic scene structure, while depth information acts as a local suppression signal that reweights features toward the foreground.
+\subsection{Dataset-Dependent Behavior}
+FruitsPark shows a different pattern: DINOv3 GAP is the best overall method, and DepthAug does not improve all backbones. This does not invalidate the proposed framework. Instead, it indicates that the benefit of sparse depth-regularized MIL depends on dataset structure, split design, and background variability. Because FruitsPark has no independent test set, validation performance may reflect collection-domain regularities. Future work should add a held-out location or season split to measure generalization more rigorously.
 
-\subsection{Stability of Late Fusion and Piecewise Depth}
-Introducing Late Fusion consistently degraded accuracy. The logarithmic combination of depth weights alters the relative strength of attention scores, causing the attention distribution either to overexpand or to become locally biased. Attention map visualization also revealed attention drifting toward the ground and background, suggesting that simple additive fusion disrupts scale consistency between depth and feature representations.
+\subsection{Efficiency Interpretation}
+The Pareto results are central to the practical value of the method. In UrbanStreetTree, using 40\% of candidate patches retains accuracy within 0.35 percentage points of the best setting while reducing average instances from 367.2 to 163.3. The random sparse baseline reaches a similar range, but its best point is slightly lower than the proposed method. This indicates that sparse patch processing itself is important, while TBS and DepthAug provide additional gains in the high-performance region. This does not yet equal a complete latency claim because preprocessing, patch scoring, GPU batching, and feature extraction overhead must be measured end-to-end. However, average instances are a direct and reproducible proxy for encoder workload, and the observed frontier shows that processing all patches is unnecessary for near-peak accuracy.
 
-Piecewise Depth produced limited improvement on UrbanStreetTree but decreased accuracy on FruitsPark. This discrepancy likely stems from differences in object distance and background composition between datasets, implying that a single discretization threshold cannot be applied universally. To make the piecewise approach more effective, dynamic segmentation or learnable optimization based on depth distribution appears necessary.
-
-\subsection{Dataset Characteristics and Generalization}
-While all depth-guided methods improved accuracy on UrbanStreetTree, several configurations led to degraded performance on FruitsPark. This can be attributed to the diverse illumination conditions, seasonal variations, and nearby ground and neighboring trees in FruitsPark, all of which introduce strong visual noise. Such environmental complexity can cause the depth estimation model to misclassify foreground and background regions, thereby reducing the reliability of depth-based attention guidance. Consequently, the effectiveness of depth guidance strongly depends on the quality of depth estimation and the stability of environmental imaging conditions.
+\subsection{Limitations}
+This study has four main limitations. First, FruitsPark lacks an independent test set. Second, the current TBS score is a hand-designed Sobel measure; learnable or class-aware patch selection may improve robustness. Third, pseudo-depth maps can fail in cluttered vegetation or unusual lighting. Fourth, this paper reports patch-instance efficiency rather than a complete deployment latency benchmark. Future experiments should include held-out locations, end-to-end timing, confidence-aware depth augmentation, and direct comparisons with recent learned efficient MIL selectors.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-This study verified the effectiveness of integrating depth information into Transformer-based models for tree image classification, with particular attention to foreground enhancement and background suppression. Experimental results demonstrated that depth-guided approaches consistently outperformed ResNet and standard ViT baselines. In particular, the Depth-guided Attention structure exhibited stable and consistent performance as an architectural extension. These findings suggest that depth information is highly compatible with the self-attention mechanism of Transformers and serves as an effective auxiliary signal for extracting key structures under varying background conditions.
-
-Conversely, simple additive fusion methods such as Late Fusion and Piecewise Depth tended to destabilize attention by disrupting the scale consistency of depth features. Effective integration of depth information therefore requires not a static arithmetic combination, but a context-aware and dynamically optimized design that adapts to the feature distribution.
-
-\subsection{Future Work}
-Future research should incorporate confidence-aware depth weighting and dynamically adaptive depth-integration modules within the Transformer architecture. In addition, the MiDaS model used in this study produces pseudo-depth maps inferred from RGB images rather than absolute distance measurements. Further experiments using physically measured depth data, such as LiDAR or stereo cameras, would provide more rigorous validation of depth-guided learning. Developing domain-specific depth estimation models optimized for particular environments, such as orchards, and extending the approach to other outdoor natural objects would also help evaluate the generalization potential of depth-assisted visual understanding.
+This paper presented a depth-regularized sparse MIL framework for mid-range tree species classification under background-dominant conditions. The method represents each image as a sparse bag of structurally informative patches, aggregates patch evidence with ABMIL, and uses depth-guided augmentation during training to reduce background shortcuts while preserving RGB-only inference. Fixed-budget four-seed experiments showed strong gains on UrbanStreetTree, where ViT DepthAug achieved 95.10\% accuracy and 94.27\% macro-$F_1$. Fixed-budget ablations showed that TBS and DepthAug improve sparse training relative to random sparse sampling, while ratio-wise comparisons showed that random sparse sampling remains a strong baseline. Pareto analysis demonstrated that near-peak performance can be retained with fewer patch instances, especially on UrbanStreetTree, where a 0.4 bag ratio remained within 0.35 percentage points of the best result while using less than half as many instances. These findings support sparse, depth-regularized weakly supervised aggregation as a practical direction for ground-level tree recognition in complex real-world scenes.
 
 \begin{thebibliography}{00}
 
-\bibitem{b1} A. Dosovitskiy \emph{et al.}, ``An Image Is Worth 16$\times$16 Words: Transformers for Image Recognition at Scale,'' in \emph{Proc. Int. Conf. Learn. Representations (ICLR)}, 2021.
+\bibitem{leafsnap} N. Kumar, P. N. Belhumeur, A. Biswas, D. W. Jacobs, W. J. Kress, I. C. Lopez, and J. V. B. Soares, ``Leafsnap: A computer vision system for automatic plant species identification,'' in \emph{Proc. Eur. Conf. Comput. Vis.}, 2012, pp. 502--516.
 
-\bibitem{b2} J. Peters, S. Wild, and L. Schmidt, ``Attention-Based Multiple Instance Learning for Visual Recognition,'' in \emph{Proc. Int. Conf. Mach. Learn. (ICML)}, 2019, pp. 7745--7755.
+\bibitem{plantnet} H. Go\"eau, P. Bonnet, and A. Joly, ``Plant identification in an open-world (LifeCLEF Plant),'' in \emph{Proc. CLEF}, 2015.
 
-\bibitem{b3} R. Ranftl, K. Lasinger, D. Hafner, K. Schindler, and V. Koltun, ``MiDaS: Towards High-Quality Monocular Depth Estimation,'' in \emph{Proc. IEEE Conf. Comput. Vis. Pattern Recognit. Workshops (CVPRW)}, 2020, pp. 131--144.
+\bibitem{barknet} M. Carpentier, P. Gigu\`ere, and J. Gaudreault, ``Tree species identification from bark images using convolutional neural networks,'' \emph{arXiv preprint arXiv:1803.00949}, 2018.
 
-\bibitem{b4} B. Robert, M. David, and A. Martin, ``Challenges in Tree Species Identification from Mid-Range Images: Dataset Interoperability and Standardization,'' \emph{Ecol. Inform.}, vol. 60, Art. no. 101284, 2020.
+\bibitem{centralbark} C. Warner, F. Wu, R. Gazo, B. Benes, N. Kong, and S. Fei, ``CentralBark image dataset and tree species classification using deep learning,'' \emph{Algorithms}, vol. 17, no. 5, Art. no. 179, 2024.
 
-\bibitem{b5} N. Kumar, P. N. Belhumeur, A. Biswas, D. W. Jacobs, W. J. Kress, I. C. Lopez, and J. V. Soares, ``Leafsnap: A Computer Vision System for Automatic Plant Species Identification,'' in \emph{Proc. Eur. Conf. Comput. Vis. (ECCV)}, 2012, pp. 502--516.
+\bibitem{urbanstreettree} L. Yang \emph{et al.}, ``Urban street tree dataset for image classification and instance segmentation,'' \emph{Computers and Electronics in Agriculture}, vol. 213, Art. no. 108233, 2023.
 
-\bibitem{b6} H. Go\"eau, P. Bonnet, and A. Joly, ``Plant Identification in an Open World (Pl@ntNet),'' in \emph{Proc. Eur. Conf. Comput. Vis. Workshops (ECCVW)}, 2013, pp. 21--33.
+\bibitem{streettree} Y. Li \emph{et al.}, ``StreetTree: A large-scale global benchmark for fine-grained tree species classification,'' \emph{arXiv preprint arXiv:2602.19123}, 2026.
 
-\bibitem{b7} R. Cerutti, L. Tougne, A. Vacavant, and D. Coquin, ``Folia: An Application for Plant Identification Using Leaf Image Analysis,'' in \emph{Proc. Int. Conf. Image Anal. Recognit. (ICIAR)}, 2013, pp. 527--534.
+\bibitem{backgroundbias} K. Xiao, L. Engstrom, A. Ilyas, and A. Madry, ``Noise or signal: The role of image backgrounds in object recognition,'' in \emph{Proc. Int. Conf. Learn. Representations}, 2021.
 
-\bibitem{b8} H. Go\"eau, P. Bonnet, A. Joly, V. Baki\'c, J. Barbe, S. Selmi, I. Yahiaoui, and A. Barth\'el\'emy, ``Pl@ntLeaves: A Leaf Image Database,'' in \emph{Proc. Int. Conf. Multimedia Retr.}, 2012.
+\bibitem{plantvillagebias} M. A. Noyan, ``Uncovering bias in the PlantVillage dataset,'' \emph{arXiv preprint arXiv:2206.04374}, 2022.
 
-\bibitem{b9} M. Carpentier, P. Gigu\`ere, and J. Gaudreault, ``BarkNet 1.0: A Dataset for Bark Classification,'' \emph{arXiv preprint arXiv:1806.03474}, 2018.
+\bibitem{texturebias} R. Geirhos \emph{et al.}, ``ImageNet-trained CNNs are biased towards texture; increasing shape bias improves accuracy and robustness,'' in \emph{Proc. Int. Conf. Learn. Representations}, 2019.
 
-\bibitem{b10} M. Ratajczak, M. Kozio\l{}, and A. Koz\l{}owski, ``Bark-101: A Dataset for Bark Species Classification Using Deep Convolutional Neural Networks,'' in \emph{Proc. Int. Conf. Image Process. (ICIP)}, 2019, pp. 103--107.
+\bibitem{dietterich} T. G. Dietterich, R. H. Lathrop, and T. Lozano-Perez, ``Solving the multiple instance problem with axis-parallel rectangles,'' \emph{Artificial Intelligence}, vol. 89, no. 1--2, pp. 31--71, 1997.
 
-\bibitem{b11} T. Kim, Y. Zhang, and Q. Wang, ``UrbanStreetTree: A Large-Scale Dataset for Urban Tree Species Classification and Segmentation,'' \emph{Remote Sens.}, vol. 14, no. 4, Art. no. 932, 2022.
+\bibitem{carbonneau} M.-A. Carbonneau, V. Cheplygina, E. Granger, and G. Gagnon, ``Multiple instance learning: A survey of problem characteristics and applications,'' \emph{Pattern Recognition}, vol. 77, pp. 329--353, 2018.
 
-\bibitem{b12} K. He, X. Zhang, S. Ren, and J. Sun, ``Deep Residual Learning for Image Recognition,'' in \emph{Proc. IEEE Conf. Comput. Vis. Pattern Recognit. (CVPR)}, 2016, pp. 770--778.
+\bibitem{deepmil} J. Wu, Y. Yu, C. Huang, and K. Yu, ``Deep multiple instance learning for image classification and auto-annotation,'' in \emph{Proc. IEEE Conf. Comput. Vis. Pattern Recognit.}, 2015, pp. 3460--3469.
 
-\bibitem{b13} M. Caron, H. Touvron, I. Misra, H. J\'egou, J. Mairal, P. Bojanowski, and A. Joulin, ``Emerging Properties in Self-Supervised Vision Transformers,'' in \emph{Proc. IEEE Int. Conf. Comput. Vis. (ICCV)}, 2021, pp. 9650--9660.
+\bibitem{abmil} M. Ilse, J. M. Tomczak, and M. Welling, ``Attention-based deep multiple instance learning,'' in \emph{Proc. Int. Conf. Mach. Learn.}, 2018, pp. 2127--2136.
 
-\bibitem{b14} Z. Liu \emph{et al.}, ``Swin Transformer: Hierarchical Vision Transformer Using Shifted Windows,'' in \emph{Proc. IEEE Int. Conf. Comput. Vis. (ICCV)}, 2021, pp. 10012--10022.
+\bibitem{clam} M. Y. Lu \emph{et al.}, ``Data-efficient and weakly supervised computational pathology on whole-slide images,'' \emph{Nature Biomedical Engineering}, vol. 5, pp. 555--570, 2021.
+
+\bibitem{dsmil} B. Li, Y. Li, and K. W. Eliceiri, ``Dual-stream multiple instance learning network for whole slide image classification with self-supervised contrastive learning,'' in \emph{Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit.}, 2021, pp. 14318--14328.
+
+\bibitem{transmil} Z. Shao \emph{et al.}, ``TransMIL: Transformer based correlated multiple instance learning for whole slide image classification,'' in \emph{Advances in Neural Information Processing Systems}, 2021.
+
+\bibitem{pamil} Y. Zheng \emph{et al.}, ``Dynamic policy-driven adaptive multi-instance learning for whole slide image classification,'' in \emph{Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit.}, 2024.
+
+\bibitem{mhim} W. Tang \emph{et al.}, ``Multiple instance learning framework with masked hard instance mining for whole slide image classification,'' in \emph{Proc. IEEE/CVF Int. Conf. Comput. Vis.}, 2023.
+
+\bibitem{acmil} Y. Zhang \emph{et al.}, ``Attention-challenging multiple instance learning for whole slide image classification,'' in \emph{Proc. Eur. Conf. Comput. Vis.}, 2024.
+
+\bibitem{keypatches} D. Araujo \emph{et al.}, ``Key patches are all you need: A multiple instance learning framework for robust medical diagnosis,'' in \emph{Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. Workshops}, 2024, pp. 5231--5240.
+
+\bibitem{hdmil} Y. Yuan \emph{et al.}, ``Fast and accurate gigapixel pathological image classification with hierarchical distillation multi-instance learning,'' \emph{arXiv preprint arXiv:2502.21130}, 2025.
+
+\bibitem{vit} A. Dosovitskiy \emph{et al.}, ``An image is worth 16$\times$16 words: Transformers for image recognition at scale,'' in \emph{Proc. Int. Conf. Learn. Representations}, 2021.
+
+\bibitem{resnet} K. He, X. Zhang, S. Ren, and J. Sun, ``Deep residual learning for image recognition,'' in \emph{Proc. IEEE Conf. Comput. Vis. Pattern Recognit.}, 2016, pp. 770--778.
+
+\bibitem{swin} Z. Liu \emph{et al.}, ``Swin Transformer: Hierarchical vision Transformer using shifted windows,'' in \emph{Proc. IEEE Int. Conf. Comput. Vis.}, 2021, pp. 10012--10022.
+
+\bibitem{dino} M. Caron \emph{et al.}, ``Emerging properties in self-supervised vision Transformers,'' in \emph{Proc. IEEE Int. Conf. Comput. Vis.}, 2021, pp. 9650--9660.
+
+\bibitem{dinov2} M. Oquab \emph{et al.}, ``DINOv2: Learning robust visual features without supervision,'' \emph{arXiv preprint arXiv:2304.07193}, 2023.
+
+\bibitem{dinov3} A. Sim\'eoni \emph{et al.}, ``DINOv3,'' \emph{arXiv preprint arXiv:2508.10104}, 2025.
+
+\bibitem{midas} R. Ranftl, K. Lasinger, D. Hafner, K. Schindler, and V. Koltun, ``Towards robust monocular depth estimation: Mixing datasets for zero-shot cross-dataset transfer,'' \emph{IEEE Trans. Pattern Anal. Mach. Intell.}, vol. 44, no. 3, pp. 1623--1637, 2022.
+
+\bibitem{depthanythingv2} L. Yang \emph{et al.}, ``Depth Anything V2,'' in \emph{Advances in Neural Information Processing Systems}, 2024.
+
+\bibitem{depthg} J. Sick, A. Hornauer, and F. P. K. B\"urger, ``Unsupervised semantic segmentation through depth-guided feature correlation and sampling,'' in \emph{Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit.}, 2024, pp. 3637--3647.
+
+\bibitem{attentionnotexplanation} S. Jain and B. C. Wallace, ``Attention is not explanation,'' in \emph{Proc. Conf. North American Chapter of the Association for Computational Linguistics: Human Language Technologies}, 2019, pp. 3543--3556.
 
 \end{thebibliography}
 
