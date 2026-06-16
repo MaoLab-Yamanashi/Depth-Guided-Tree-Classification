@@ -39,7 +39,7 @@
 \corresp{Corresponding author: Takahiro Matsumura (contact details to be confirmed).}
 
 \begin{abstract}
-Tree species classification from ground-level images is important for urban forestry, orchard management, and ecological monitoring. Existing recognition systems often assume close-up views of leaves, flowers, fruits, or bark, whereas practical field images are frequently captured from mid-range distances. In this setting, discriminative evidence from trunks, branches, and bark occupies only a small part of the image, while buildings, roads, sky, signs, vehicles, and neighboring trees dominate the background. This creates a background-dominant weakly supervised recognition problem: image-level labels are available, but the informative regions are sparse and not manually annotated. This paper proposes a depth-regularized sparse multiple instance learning framework for mid-range tree species classification. Images are converted into bags of local patches, trunk-biased sampling selects structurally informative patches using gradient-based scores, and attention-based multiple instance learning aggregates the selected instances. Depth-guided augmentation is used only during training to preserve foreground tree structures while perturbing background regions, so inference requires RGB images only. Experiments on FruitsPark and UrbanStreetTree compare image-level baselines, sparse MIL, and sparse depth-augmented MIL under a four-seed protocol. In the fixed-budget backbone comparison on UrbanStreetTree, ViT DepthAug achieves 95.10\% accuracy and 94.27\% macro-$F_1$, improving over the corresponding ViT GAP baseline by 10.49 and 12.50 percentage points, respectively. A separate DINOv2 ratio sweep further shows that near-peak performance can be retained with substantially fewer patches: on UrbanStreetTree, a 0.4 bag ratio achieves 95.98\% accuracy, within 0.35 percentage points of the best result, while using 163.3 rather than 367.2 instances on average. These results indicate that depth-regularized sparse MIL is an effective and patch-efficient strategy for tree classification under background-dominant mid-range imaging conditions.
+Tree species classification from ground-level images is important for urban forestry, orchard management, and ecological monitoring. Existing recognition systems often assume close-up views of leaves, flowers, fruits, or bark, whereas practical field images are frequently captured from mid-range distances. In this setting, discriminative evidence from trunks, branches, and bark occupies only a small part of the image, while buildings, roads, sky, signs, vehicles, and neighboring trees dominate the background. This creates a background-dominant weakly supervised recognition problem: image-level labels are available, but the informative regions are sparse and not manually annotated. This paper proposes a depth-regularized sparse multiple instance learning framework for mid-range tree species classification. Images are converted into bags of local patches, trunk-biased sampling selects structurally informative patches using gradient-based scores, and attention-based multiple instance learning aggregates the selected instances. Depth-guided augmentation is used only during training to preserve foreground tree structures while perturbing background regions, so inference requires RGB images only. Dataset diagnostics show that background and acquisition-context probes can perform far above chance, supporting the need for background-regularized aggregation. Experiments on FruitsPark and UrbanStreetTree compare image-level baselines, sparse MIL, and sparse depth-augmented MIL under a unified seed-42 protocol. In the fixed-budget backbone comparison on UrbanStreetTree, ViT DepthAug achieves 95.80\% accuracy and 95.00\% macro-$F_1$, outperforming the corresponding ViT GAP protocol by 36.36 and 36.66 percentage points, respectively. A separate DINOv2 ratio sweep further shows that near-peak performance can be retained while reducing the patch budget: on UrbanStreetTree, a 0.6 bag ratio achieves 97.20\% accuracy, within 0.70 percentage points of the best observed result, while using 244.5 rather than 285.1 instances on average. Multi-seed efficiency analysis further shows that sparse training reduces time-to-best and processed patches, and end-to-end inference benchmarks show lower latency and GPU memory than full-patch inference. These results suggest that depth-regularized sparse MIL is an effective and computationally efficient strategy for tree classification under background-dominant mid-range imaging conditions.
 \end{abstract}
 
 \begin{keywords}
@@ -60,20 +60,47 @@ Close-up bark classification provides a second useful but incomplete precedent. 
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.9\columnwidth]{figures/fig01_samples.png}
-\caption{Examples of tree images captured at different distances. Mid-range observations contain larger background regions and weaker local bark texture than close-up observations.}
+\setlength{\tabcolsep}{2pt}
+\begin{tabular}{cc}
+\includegraphics[width=0.47\columnwidth,height=0.17\textheight,keepaspectratio]{figures/raw_converted/range_close_image_pub.jpg} &
+\includegraphics[width=0.47\columnwidth,height=0.17\textheight,keepaspectratio]{figures/raw_converted/range_mid_image_pub.jpg} \\
+Close-up trunk & Mid-range scene
+\end{tabular}
+\caption{Examples of close-up and mid-range tree images. Mid-range observations contain larger background regions and weaker local bark texture than close-up observations.}
 \label{fig:distance_examples}
 \end{figure}
+
+\begin{figure*}[t]
+\centering
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{cccc}
+\includegraphics[height=0.24\textheight]{figures/raw_converted/distance_1m_pub.jpg} &
+\includegraphics[height=0.24\textheight]{figures/raw_converted/distance_3m_pub.jpg} &
+\includegraphics[height=0.24\textheight]{figures/raw_converted/distance_4m_pub.jpg} &
+\includegraphics[height=0.24\textheight]{figures/raw_converted/distance_6m_pub.jpg} \\
+1.0 m & 3.0 m & 4.0 m & 6.0 m
+\end{tabular}
+\caption{Distance-dependent appearance of the same trunk region. As the camera moves away from the tree, bark texture becomes less resolved and the visible trunk evidence occupies fewer effective pixels.}
+\label{fig:distance_inconsistency}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.82\textwidth]{figures/fig03_texture_degradation_tikz.pdf}
+\caption{Relative degradation of texture descriptors measured from the distance-series trunk images in Fig.~\ref{fig:distance_inconsistency}. Most local texture measures decrease with distance, while the high-frequency ratio is comparatively stable; this motivates using sparse patch aggregation rather than relying only on close-up texture cues.}
+\label{fig:texture_degradation}
+\end{figure*}
 
 We formulate this setting as a background-dominant multiple instance learning (MIL) problem. An image is represented as a bag of patches, only the image-level species label is available, and the classifier must infer which instances are informative. Attention-based MIL (ABMIL) provides a differentiable pooling mechanism that assigns weights to instances and yields patch-level diagnostics \cite{abmil}. However, full-patch MIL is computationally expensive when high-resolution images are processed densely, and recent sparse MIL studies have shown that instance selection, masking, and pruning are important design axes rather than mere implementation details \cite{pamil,mhim,acmil,keypatches,hdmil}. Naive sparse sampling can discard useful trunk or branch patches. We therefore introduce trunk-biased sampling (TBS), which selects a sparse subset of candidate patches by combining sliding-window coverage with gradient-based structural scores. To reduce background shortcuts during training, we further use depth-guided augmentation (DepthAug), which preserves depth-derived foreground structures while perturbing background regions. Depth is used only for data construction or training-time augmentation; the final model uses RGB images only at inference.
 
 The contributions of this paper are as follows:
 \begin{itemize}
 \item We formulate ground-level mid-range tree species classification as a background-dominant weakly supervised patch aggregation problem.
+\item We provide dataset-level shortcut diagnostics showing that acquisition context and background-only signals can be predictive under the available splits.
 \item We propose a sparse MIL framework that combines trunk-biased patch selection, Vision Transformer-based feature extraction, and ABMIL aggregation.
 \item We incorporate depth-guided augmentation as a training-only regularizer for suppressing background shortcuts without requiring depth at inference.
-\item We evaluate image-level baselines, sparse MIL, and sparse DepthAug MIL under a unified four-seed protocol on FruitsPark and UrbanStreetTree.
-\item We quantify the accuracy--patch-budget Pareto frontier and show that near-peak accuracy can be maintained with substantially fewer instances, especially on UrbanStreetTree.
+\item We evaluate image-level baselines, sparse MIL, and sparse DepthAug MIL under a unified seed-42 protocol on FruitsPark and UrbanStreetTree, with a separate multi-seed sparse-selection diagnostic.
+\item We quantify training and inference efficiency, showing that sparse patch usage can reduce wall-clock training cost, inference latency, and GPU memory while retaining competitive accuracy.
 \end{itemize}
 
 \section{Related Work}
@@ -117,12 +144,12 @@ However, these studies do not establish whether training-only depth is effective
 \subsection{Overview}
 The proposed framework converts a mid-range tree image into a sparse bag of structurally informative patches, extracts patch features with a visual backbone, and aggregates them with ABMIL. Depth-guided augmentation is applied during training to reduce dependence on background context. Fig.~\ref{fig:framework} illustrates the overall process.
 
-\begin{figure*}[t]
+\begin{figure}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig04_framework_current.png}
-\caption{Overview of the sparse MIL framework. The current main line uses RGB patches at inference, trunk-biased sparse sampling, ABMIL aggregation, and training-only depth-guided augmentation.}
+\includegraphics[width=\columnwidth]{figures/fig04_framework_model.png}
+\caption{Overview of the sparse MIL framework. The main inference path uses RGB images only: candidate patches are sampled by TBS, encoded by a visual backbone, aggregated by ABMIL, and classified at the bag level. The depth-guided augmentation branch is used only during training.}
 \label{fig:framework}
-\end{figure*}
+\end{figure}
 
 \subsection{Image-to-Bag Construction}
 Given an input image $x$, candidate patches are generated with a sliding window on the original image resolution. Let $\mathcal{C}(x)=\{q_1,\ldots,q_M\}$ denote the candidate patch set. A sparse bag $\mathcal{B}(x)$ is selected from $\mathcal{C}(x)$ according to a bag ratio $\rho \in (0,1]$, so that approximately $K=\mathrm{round}(\rho M)$ patches are processed by the MIL model. Unlike a fixed patch count, the ratio-based definition preserves a comparable fraction of available local evidence across images with different effective resolutions.
@@ -135,7 +162,7 @@ S_{\mathrm{sobel}}(q)=\frac{1}{|q|}\sum_{u \in q}\|\nabla I(u)\|_2,
 \end{equation}
 where $I$ is the image intensity and $u$ indexes pixels in the patch. Candidate patches are ranked by $S_{\mathrm{sobel}}$. A trunk-bias parameter $\beta$ controls the fraction of the selected bag that is deterministically filled from the highest-scoring candidates. The remaining instances are filled from lower-ranked candidates using a seed-controlled shuffle. In the reported sliding-window TBS setting, we use $\beta=0.5$.
 
-This selection is intentionally simple and deterministic. It is not intended to segment the trunk exactly; rather, it shifts the sparse bag toward structurally informative regions while retaining enough diversity for ABMIL to learn which patches are useful.
+This selection is intentionally simple and deterministic. It is not intended to segment the trunk exactly; rather, it shifts the sparse bag toward structurally informative regions while retaining enough diversity for ABMIL to learn which patches are useful. This makes TBS a structural prior rather than a claimed optimal sampler.
 
 \subsection{Patch Feature Extraction and ABMIL}
 Each selected patch $p_i \in \mathcal{B}(x)$ is encoded by a backbone feature extractor $\phi(\cdot)$:
@@ -180,6 +207,8 @@ Let $D(x)$ be a normalized relative depth map and $m(x)$ a foreground mask deriv
 \end{equation}
 where $T(\cdot)$ applies background perturbations such as blur, color transformation, or compression. Validation and test images are not augmented in this way. At inference, the model receives only RGB images and uses the same TBS and ABMIL pipeline.
 
+In the final protocol, pseudo-depth maps are generated with MiDaS Hybrid. This choice is made by the depth-source screening experiment in Section~\ref{sec:prelim_config}: MiDaS Hybrid gives the best UrbanStreetTree test result among the evaluated depth sources at the fixed sparse budget, while remaining competitive on FruitsPark validation.
+
 \section{Experimental Setup}
 \label{sec:experiments}
 
@@ -188,14 +217,28 @@ We evaluate on two datasets. FruitsPark is an in-house dataset collected at a pu
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig05_fruitspark.png}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{ccccc}
+\includegraphics[height=0.18\textheight]{figures/raw_converted/fruitspark_cherry_pub.jpg} &
+\includegraphics[height=0.18\textheight]{figures/raw_converted/fruitspark_kiwi_pub.jpg} &
+\includegraphics[height=0.18\textheight]{figures/raw_converted/fruitspark_peach_pub.jpg} &
+\includegraphics[height=0.18\textheight]{figures/raw_converted/fruitspark_persimmon_pub.jpg} &
+\includegraphics[height=0.18\textheight]{figures/raw_converted/fruitspark_pomegranate_pub.jpg}
+\end{tabular}
 \caption{Sample images from FruitsPark. The dataset contains seasonal and background variation within a park environment.}
 \label{fig:fruitspark_samples}
 \end{figure*}
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig06_urbanstreettree.png}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{ccccc}
+\includegraphics[height=0.18\textheight]{figures/raw_converted/urban_albizia_pub.jpg} &
+\includegraphics[height=0.18\textheight]{figures/raw_converted/urban_ginkgo_pub.jpg} &
+\includegraphics[height=0.18\textheight]{figures/raw_converted/urban_lagerstroemia_pub.jpg} &
+\includegraphics[height=0.18\textheight]{figures/raw_converted/urban_magnolia_pub.jpg} &
+\includegraphics[height=0.18\textheight]{figures/raw_converted/urban_platanus_pub.jpg}
+\end{tabular}
 \caption{Sample images from UrbanStreetTree \cite{urbanstreettree}. Street scenes contain complex backgrounds such as roads, buildings, vehicles, and neighboring trees.}
 \label{fig:urbanstreettree_samples}
 \end{figure*}
@@ -217,25 +260,182 @@ Final evaluation split & Validation & Test \\
 \end{tabular}
 \end{table}
 
+\subsection{Dataset Analysis}
+\label{sec:dataset_analysis}
+
+We further analyzed the two datasets to clarify why mid-range tree recognition is vulnerable to shortcut learning. This analysis is diagnostic and is not used for model selection. We define a \emph{source group} as an acquisition sequence after removing frame indices for FruitsPark and as the branch-series identifier for UrbanStreetTree. In FruitsPark, 11 of 215 source groups cross the train/validation split, and 54 of 210 validation images belong to source groups also present in training. In UrbanStreetTree, all 13 source groups cross train, validation, and test splits; all validation and test images therefore share the same source-group identifiers as training images. These observations indicate that the reported splits are useful for controlled in-distribution comparison, but they should not be interpreted as a strict held-out location, individual-tree, or acquisition-series evaluation.
+
+The UrbanStreetTree masks also confirm the background-dominant nature of the task. Across 1,485 masked images, the median foreground area ratio is only 0.081, with 5th and 95th percentiles of 0.024 and 0.233. Thus, the annotated tree region usually occupies a small fraction of the image, while roads, buildings, sky, vehicles, and neighboring vegetation dominate the pixel area. This supports our formulation of the problem as weakly supervised sparse evidence aggregation under strong background context.
+
+\begin{table*}[t]
+\centering
+\caption{Dataset shortcut probes. Balanced accuracy is reported; chance is 0.100 for FruitsPark and 0.077 for UrbanStreetTree. The linear probes use low-resolution or spatially restricted image features, while the SmallCNN probes use VOC-mask variants on UrbanStreetTree.}
+\label{tab:dataset_shortcut_probes}
+\scriptsize
+\begin{tabular}{llccc}
+\toprule
+Dataset & Probe input & Eval split & Balanced accuracy & Interpretation \\
+\midrule
+FruitsPark & Border-only linear probe & Val & 0.471 & Peripheral context exceeds chance \\
+FruitsPark & Corner-only linear probe & Val & 0.310 & Weak scene cues remain informative \\
+UrbanStreetTree & Full 16$\times$16 linear probe & Test & 0.423 & Coarse layout is predictive \\
+UrbanStreetTree & Background-only linear probe & Test & 0.374 & Background exceeds foreground-only linear probe \\
+UrbanStreetTree & Foreground-only linear probe & Test & 0.264 & Tree mask alone is less predictive for the linear probe \\
+UrbanStreetTree & Full SmallCNN & Test & 0.728 & Standard image baseline \\
+UrbanStreetTree & Background-only SmallCNN & Test & 0.701 & Background nearly matches full-image SmallCNN \\
+UrbanStreetTree & Tree-only SmallCNN & Test & 0.763 & Tree structure also contains strong split-specific cues \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Table~\ref{tab:dataset_shortcut_probes} summarizes two lightweight shortcut probes. First, a standardized linear classifier trained on very low-resolution, border-only, corner-only, or mask-derived features already performs far above chance. On UrbanStreetTree test, background-only mask features reach 0.374 balanced accuracy, whereas foreground-only mask features reach 0.264. Second, a scratch-trained SmallCNN on UrbanStreetTree shows the same tendency at a higher capacity: background-only images reach 0.701 balanced accuracy on test, close to the 0.728 obtained from full images. Tree-only images reach 0.763, so the result should not be read as ``only background matters.'' Rather, both background/acquisition context and tree-region appearance contain split-correlated information. Fig.~\ref{fig:dataset_smallcnn_mask} visualizes the SmallCNN mask ablation.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.82\textwidth]{figures/fig_dataset_smallcnn_mask_ablation.png}
+\caption{UrbanStreetTree SmallCNN mask ablation. Background-only images are produced by replacing the VOC tree mask with a neutral gray region, while tree-only images replace the background. The background-only condition remains far above chance, indicating that scene context alone can carry substantial class-correlated signal.}
+\label{fig:dataset_smallcnn_mask}
+\end{figure*}
+
+We also inspect ResNet18 GAP attention maps as a qualitative diagnostic for a conventional image-level baseline. Fig.~\ref{fig:resnetgap_attention} shows that high-response regions can fall on background buildings, roads, or scene context rather than on discriminative trunk and branch regions. These maps are not treated as causal explanations, but they illustrate the practical failure mode that motivates sparse MIL and training-time background perturbation: an image-level classifier can obtain high confidence while relying on correlated scene context.
+
+\begin{figure*}[t]
+\centering
+\setlength{\tabcolsep}{2pt}
+\scriptsize
+\begin{tabular}{cccccc}
+\includegraphics[width=0.155\textwidth]{figures/raw_converted/resnetgap_koelreuteria_pred_salix.png} &
+\includegraphics[width=0.155\textwidth]{figures/raw_converted/resnetgap_liriodendron_correct.png} &
+\includegraphics[width=0.155\textwidth]{figures/raw_converted/resnetgap_styphnolobium_correct_lowconf.png} &
+\includegraphics[width=0.155\textwidth]{figures/raw_converted/resnetgap_peach_correct.png} &
+\includegraphics[width=0.155\textwidth]{figures/raw_converted/resnetgap_pear_correct.png} &
+\includegraphics[width=0.155\textwidth]{figures/raw_converted/resnetgap_kiwi_pred_persimmon.png} \\
+Koel. $\rightarrow$ Salix &
+Lirio. $\rightarrow$ Lirio. &
+Styph. $\rightarrow$ Styph. &
+Peach $\rightarrow$ Peach &
+Pear $\rightarrow$ Pear &
+Kiwi $\rightarrow$ Persimmon
+\end{tabular}
+\caption{ResNet18 GAP attention-map examples. Red regions indicate stronger responses. Several maps emphasize buildings, road-side context, or background structure, including incorrect predictions. This supports the need to reduce reliance on global scene context in background-dominant tree images.}
+\label{fig:resnetgap_attention}
+\end{figure*}
+
 \subsection{Compared Models}
-The overall comparison includes three groups. First, image-level GAP baselines use ResNet18 \cite{resnet}, ViT \cite{vit}, DINO/DINOv2/DINOv3 ViT backbones \cite{dino,dinov2,dinov3}, and Swin Transformer \cite{swin}. These baselines use trainable backbones. Second, sparse MIL models use frozen backbones and TBS with $\rho=0.3$. Third, sparse DepthAug models use the same sparse MIL setting but train on depth-augmented datasets. The arrows in Table~\ref{tab:overall_results} compare the reported image-level and MIL protocols within the same backbone family; they should be interpreted as protocol-level differences rather than a strictly matched frozen-backbone linear-probe comparison. All reported results use four seeds: 0042, 2024, 2025, and 3407.
+The overall comparison includes three groups. First, image-level GAP baselines use ResNet18 \cite{resnet}, ViT \cite{vit}, DINO/DINOv2/DINOv3 ViT backbones \cite{dino,dinov2,dinov3}, and Swin Transformer \cite{swin}. Second, sparse MIL models use frozen backbones and TBS with $\rho=0.3$. Third, sparse DepthAug models use the same sparse MIL setting but train on depth-augmented datasets. The arrows in Table~\ref{tab:overall_results} compare the reported image-level and MIL protocols within the same backbone family; they should be interpreted as protocol-level differences rather than a strictly matched architecture-only comparison. Unless otherwise noted, reported quantitative results use seed 42.
 
-The Pareto efficiency experiment fixes the backbone to DINOv2 and the model family to TBS sparse MIL with DepthAug, then sweeps $\rho \in \{0.1,0.2,\ldots,1.0\}$ over four seeds. We report accuracy, macro-$F_1$, and average instances per bag. Patch instances are a direct proxy for encoder workload; wall-clock latency should be measured separately before making deployment-specific timing claims.
+The Pareto efficiency experiment fixes the backbone to DINOv2 and the model family to TBS sparse MIL with DepthAug, then sweeps $\rho \in \{0.1,0.2,\ldots,1.0\}$ using seed 42. We report accuracy, macro-$F_1$, and average instances per bag. Patch instances are a direct proxy for encoder workload, while the additional efficiency analysis reports wall-clock training curves and end-to-end inference timing.
 
-We also include two sparse-selection checks. First, a fixed-budget condition ablation compares full training/full evaluation, full training/sparse evaluation, random sparse training/evaluation, TBS sparse training/evaluation, and TBS sparse training with DepthAug followed by sparse RGB evaluation. Second, a ratio-wise comparison evaluates the proposed TBS-DepthAug configuration against random sparse sampling at the same bag ratios. These analyses are used to determine whether the proposed sampling and augmentation strategy improves over patch-count reduction alone.
+We also include a fixed-budget sparse-selection diagnostic that compares full training/full evaluation, full training/sparse evaluation, random sparse training/evaluation, TBS sparse training/evaluation, and TBS sparse training with DepthAug followed by sparse RGB evaluation. This diagnostic is used to test whether sparse selection and DepthAug improve over patch-count reduction alone. The multi-seed learning-efficiency and inference-efficiency analyses use four seeds, 42, 2024, 2025, and 3407.
 
 \subsection{Implementation Details}
-All models are trained for 30 epochs. GAP baselines use batch size 32, whereas MIL models use batch size 1 because each image is represented as a patch bag. Dataset-specific normalization is computed from the training split. Sparse MIL and DepthAug models use softmax ABMIL attention, Sobel TBS scoring, $\lambda_a=5\times10^{-4}$, no entropy regularization, and automatic mixed precision. The experiments were run on a workstation with NVIDIA RTX A6000 GPUs, CUDA 12.9, an AMD Ryzen Threadripper 7960X CPU, and 62 GiB system memory.
+All main models are trained for 30 epochs. GAP baselines use batch size 32, whereas MIL models use batch size 1 because each image is represented as a patch bag. Dataset-specific normalization is computed from the training split. Sparse MIL and DepthAug models use softmax ABMIL attention, Sobel TBS scoring, $\lambda_a=5\times10^{-4}$, no entropy regularization, and automatic mixed precision. Inference timing uses five warm-up iterations and 50 measured images per run, and includes patch generation and selection, transfer to GPU, backbone forward computation, and MIL aggregation. The experiments were run on a workstation with NVIDIA RTX A6000 GPUs, CUDA 12.9, an AMD Ryzen Threadripper 7960X CPU, and 62 GiB system memory.
+
+\subsection{Preliminary Configuration Analysis}
+\label{sec:prelim_config}
+Before the main experiments, we ran preliminary single-seed ablations on UrbanStreetTree validation to choose practical settings for the sparse MIL pipeline. These runs are not used as the main benchmark; they are used only to justify configuration choices. Table~\ref{tab:prelim_ablation} summarizes the selected conditions that directly informed the final design.
+
+\begin{table*}[t]
+\centering
+\caption{Selected preliminary ablations used for configuration choices on UrbanStreetTree validation. Values are accuracy in percent.}
+\label{tab:prelim_ablation}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llcc}
+\toprule
+Category & Setting & Best validation accuracy & Final validation accuracy \\
+\midrule
+Attention penalty & No attention regularization & 93.29 & 92.62 \\
+Attention penalty & $\ell_2$ attention penalty & 94.63 & 94.63 \\
+Patch score & Laplacian variance & 93.96 & 90.60 \\
+Patch score & Sobel gradient & 94.63 & 93.96 \\
+Patch score & High-pass filter & 92.62 & 91.95 \\
+Sampling & Random sparse sampling & 95.30 & 95.30 \\
+Sampling & Sliding-window TBS & 95.30 & 93.96 \\
+Sampling & Mixed sampling & 94.63 & 92.62 \\
+Backbone & ViT Tiny & 90.60 & 85.91 \\
+Backbone & ViT Small & 93.29 & 93.29 \\
+Backbone & Swin Tiny & 74.50 & 74.50 \\
+Backbone & Swin Small & 89.26 & 89.26 \\
+Attention normalization & Softmax ABMIL & 95.30 & 93.96 \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+The preliminary ablation supports three design choices. First, attention-concentration control can help, but the final model keeps this regularization simple by using only the $\ell_2$-style term in \eqref{eq:loss}. Second, Sobel scoring is a suitable hand-designed structural score: it performs better than the high-pass alternative and avoids relying on a more complex learned selector. Third, random sparse sampling can be competitive, but sliding-window TBS provides a deterministic structural prior aligned with the target evidence in trunks and branches. We therefore use TBS in the main method and retain random sampling only as a diagnostic baseline in the sparse-selection analysis. Softmax ABMIL is used in the final experiments because it is the standard ABMIL normalization and keeps the analysis directly comparable to the original MIL formulation.
+
+We further tuned the two sparse-selection parameters on UrbanStreetTree using a 10$\times$5 grid over bag ratio $\rho\in\{0.1,\ldots,1.0\}$ and trunk-bias parameter $\beta\in\{0.1,0.3,0.5,0.7,0.9\}$. Table~\ref{tab:param_tuning} summarizes the most relevant operating points. The best final test accuracy is obtained at $\rho=0.8,\beta=0.5$, but this setting processes a much larger fraction of candidate patches. The fixed-budget backbone comparison instead uses $\rho=0.3,\beta=0.5$ because it is a deliberately sparse operating point: it reaches 95.10\% test accuracy and 94.63\% macro-$F_1$ while keeping the validation--test gap to only 0.20 percentage points. This setting ranked seventh among the 50 grid-search runs and was the best $\rho=0.3$ configuration. Thus, $\rho=0.3$ is used for controlled sparse-budget comparisons, whereas the later Pareto analysis studies how performance changes when the patch budget is relaxed. The same search also supports $\beta=0.5$: three of the top seven configurations use this trunk-bias value, including the best overall and the selected sparse operating point.
+
+\begin{table*}[t]
+\centering
+\caption{UrbanStreetTree parameter tuning for bag ratio $\rho$ and trunk-bias parameter $\beta$. Accuracy and macro-$F_1$ are test percentages; the gap is best validation accuracy minus test accuracy in percentage points.}
+\label{tab:param_tuning}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+Choice & $\rho$ & $\beta$ & Best val acc. & Test acc. & Test macro-$F_1$ & Gap \\
+\midrule
+Best test accuracy & 0.8 & 0.5 & 97.99 & \textbf{96.50} & \textbf{96.32} & 1.48 \\
+High-validation, same $\beta$ & 0.7 & 0.5 & 98.66 & 95.80 & 95.40 & 2.85 \\
+Compact high performer & 0.4 & 0.1 & 97.32 & 95.80 & 95.28 & 1.51 \\
+Full-budget alternative & 1.0 & 0.9 & 97.32 & 95.10 & 94.55 & 2.21 \\
+Low-gap high performer & 0.7 & 0.7 & 95.97 & 95.10 & 94.55 & 0.87 \\
+Selected fixed budget & 0.3 & 0.5 & 95.30 & \underline{95.10} & \underline{94.63} & \underline{0.20} \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+Fig.~\ref{fig:filter_response_depthaug} provides a qualitative check for the Sobel--DepthAug combination. On the raw image, all high-frequency filters respond not only to the trunk and branches but also to building edges and pavement texture. After the depth-guided background perturbation, background responses are suppressed, while the Sobel response still preserves the main trunk and branch contours. Laplacian and high-pass responses also retain structural information, but the preliminary validation in Table~\ref{tab:prelim_ablation} favors Sobel. This supports the interpretation that Sobel scoring and DepthAug address complementary sources of error: TBS biases sparse patch selection toward tree structure, while DepthAug reduces background evidence available during training.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.94\textwidth]{figures/fig_prelim_filter_raw.png}\\[2pt]
+\includegraphics[width=0.94\textwidth]{figures/fig_prelim_filter_depthaug.png}
+\caption{Qualitative filter-response comparison before and after depth-guided background perturbation. The raw image contains strong building and pavement edges, whereas the depth-augmented image suppresses much of this background response while retaining trunk and branch structure. This diagnostic supports using Sobel scoring together with DepthAug.}
+\label{fig:filter_response_depthaug}
+\end{figure*}
+
+We also screened the pseudo-depth source used by DepthAug. Table~\ref{tab:prelim_depth} reports the depth-source diagnostic at $\rho=0.3$ using seed 42. On UrbanStreetTree, MiDaS Hybrid achieves the strongest test performance among the evaluated depth-inferred augmentations, with 96.50\% accuracy and 95.44\% macro-$F_1$. It also exceeds the oracle-mask augmentation runs in this diagnostic: the oracle-mask mean over seeds 42--45 is 87.24\% accuracy and 84.92\% macro-$F_1$, and the best oracle-mask seed reaches 93.71\% and 92.70\%. On FruitsPark, Marigold is slightly higher on validation, but MiDaS Hybrid remains within 0.48 percentage points in accuracy. Because UrbanStreetTree has an independent test split and is the more direct street-scene benchmark, we use MiDaS Hybrid as the standard pseudo-depth source in the final experiments. The depth model is not used at inference; it only constructs training-time background perturbations.
+
+\begin{table*}[t]
+\centering
+\caption{Depth-source screening for DepthAug at $\rho=0.3$. Accuracy and macro-$F_1$ are percentages. FruitsPark is validation-only; UrbanStreetTree is evaluated on test.}
+\label{tab:prelim_depth}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llccc}
+\toprule
+Dataset & Depth/Mask source & Split & Accuracy & Macro-$F_1$ \\
+\midrule
+FruitsPark & Marigold & Val & 90.00 & 89.97 \\
+FruitsPark & Depth Anything V2 & Val & 89.52 & 89.45 \\
+FruitsPark & MiDaS Hybrid & Val & 89.52 & 89.33 \\
+\midrule
+UrbanStreetTree & MiDaS Hybrid & Test & \textbf{96.50} & \textbf{95.44} \\
+UrbanStreetTree & DPT Large Original & Test & 94.41 & 93.83 \\
+UrbanStreetTree & Marigold & Test & 94.41 & 93.75 \\
+UrbanStreetTree & MiDaS Large & Test & 93.01 & 91.62 \\
+UrbanStreetTree & Depth Anything V2 & Test & 86.01 & 83.89 \\
+UrbanStreetTree & Oracle mask, seed 42 & Test & 81.12 & 77.63 \\
+UrbanStreetTree & Oracle mask, seeds 42--45 mean & Test & $87.24\pm5.34$ & $84.92\pm6.28$ \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig23_depth_model_comparison.png}
+\caption{UrbanStreetTree depth-source comparison for DepthAug at $\rho=0.3$. MiDaS Hybrid gives the best test macro-$F_1$ among the evaluated pseudo-depth sources and is therefore used as the standard depth model in the final protocol.}
+\label{fig:depth_model_comparison}
+\end{figure*}
 
 \section{Results}
 \label{sec:results}
 
 \subsection{Overall Comparison}
-Table~\ref{tab:overall_results} reports the complete four-seed results for the fixed-budget backbone comparison. On UrbanStreetTree, sparse MIL improves over image-level ViT GAP, and DepthAug provides a further gain. ViT DepthAug achieves the best mean result in this fixed-budget comparison, 95.10\% accuracy and 94.27\% macro-$F_1$. DINOv2 DepthAug is close, with 94.93\% accuracy and 94.13\% macro-$F_1$. On FruitsPark, the strongest image-level models remain highly competitive; DINOv3 GAP reaches 97.62\% accuracy and 97.60\% macro-$F_1$. The best sparse DepthAug model on FruitsPark is DINOv2 DepthAug, with 93.81\% accuracy and 93.87\% macro-$F_1$.
+Table~\ref{tab:overall_results} reports the seed-42 fixed-budget backbone comparison. On UrbanStreetTree, sparse MIL improves over the corresponding image-level ViT GAP protocol, and DepthAug provides a further gain. ViT DepthAug achieves the best result in this fixed-budget comparison, 95.80\% accuracy and 95.00\% macro-$F_1$. On FruitsPark, DINOv2 DepthAug is the best configuration, reaching 96.19\% accuracy and 96.21\% macro-$F_1$. These results support the main premise that patch-level aggregation can be more suitable than image-level GAP when useful tree evidence is sparse and background regions dominate the image.
 
 \begin{table*}[t]
 \centering
-\caption{Complete four-seed results for all configurations. Values are mean $\pm$ standard deviation in percent. FruitsPark is evaluated on validation; UrbanStreetTree is evaluated on test. Colored arrows show the change in percentage points relative to the reported Image-level GAP protocol of the same backbone family: blue upward arrows indicate gains and red downward arrows indicate losses.}
+\caption{Seed-42 results for all configurations. Values are percentages. FruitsPark is evaluated on validation; UrbanStreetTree is evaluated on test. Colored arrows show the change in percentage points relative to the reported Image-level GAP protocol of the same backbone family: blue upward arrows indicate gains and red downward arrows indicate losses.}
 \label{tab:overall_results}
 \scriptsize
 \resizebox{\textwidth}{!}{%
@@ -245,34 +445,34 @@ Group & Model & \multicolumn{2}{c}{FruitsPark} & \multicolumn{2}{c}{UrbanStreetT
 \cmidrule(lr){3-4}\cmidrule(lr){5-6}
  & & Accuracy & Macro-$F_1$ & Accuracy & Macro-$F_1$ \\
 \midrule
-Image-level & ResNet18 GAP & $93.93 \pm 1.96$ & $93.85 \pm 2.10$ & $83.92 \pm 3.28$ & $81.40 \pm 3.95$ \\
-Image-level+Aug & ResNet18 GAP Aug & $92.14 \pm 2.59$ \loss{1.79} & $92.01 \pm 2.72$ \loss{1.84} & $83.57 \pm 2.32$ \loss{0.35} & $81.55 \pm 1.61$ \gain{0.16} \\
-Sparse MIL & ResNet18 MIL & $35.36 \pm 2.84$ \loss{58.57} & $33.97 \pm 3.14$ \loss{59.88} & $9.79 \pm 5.62$ \loss{74.13} & $6.96 \pm 3.26$ \loss{74.44} \\
+Image-level & ResNet18 GAP & $80.48$ & $80.25$ & $74.13$ & $68.87$ \\
+Image-level+Aug & ResNet18 GAP Aug & $80.95$ \gain{0.48} & $80.53$ \gain{0.28} & $68.53$ \loss{5.59} & $64.89$ \loss{3.98} \\
+Sparse MIL & ResNet18 MIL & $33.33$ \loss{47.14} & $32.69$ \loss{47.56} & $11.89$ \loss{62.24} & $8.42$ \loss{60.46} \\
 \midrule
-Image-level & ViT GAP & $95.12 \pm 1.57$ & $95.05 \pm 1.62$ & $84.62 \pm 2.74$ & $81.77 \pm 3.12$ \\
-Image-level+Aug & ViT GAP Aug & $94.76 \pm 1.23$ \loss{0.36} & $94.65 \pm 1.44$ \loss{0.41} & $84.97 \pm 3.81$ \gain{0.35} & $82.11 \pm 4.22$ \gain{0.34} \\
-Sparse MIL & ViT MIL & $86.67 \pm 1.60$ \loss{8.45} & $86.42 \pm 1.58$ \loss{8.63} & $91.61 \pm 1.28$ \gain{6.99} & $90.53 \pm 1.78$ \gain{8.76} \\
-Sparse DepthAug & ViT DepthAug & $88.21 \pm 2.18$ \loss{6.90} & $88.24 \pm 2.21$ \loss{6.81} & $\mathbf{95.10 \pm 1.81}$ \gain{10.49} & $\mathbf{94.27 \pm 2.37}$ \gain{12.50} \\
+Image-level & ViT GAP & $81.90$ & $81.86$ & $59.44$ & $58.34$ \\
+Image-level+Aug & ViT GAP Aug & $87.62$ \gain{5.71} & $87.30$ \gain{5.44} & $71.33$ \gain{11.89} & $70.60$ \gain{12.26} \\
+Sparse MIL & ViT MIL & $87.62$ \gain{5.71} & $87.51$ \gain{5.65} & $93.01$ \gain{33.57} & $92.40$ \gain{34.06} \\
+Sparse DepthAug & ViT DepthAug & $87.62$ \gain{5.71} & $87.51$ \gain{5.66} & $\mathbf{95.80}$ \gain{36.36} & $\mathbf{95.00}$ \gain{36.66} \\
 \midrule
-Image-level & DINOv1 GAP & $60.24 \pm 3.12$ & $59.49 \pm 3.16$ & $57.17 \pm 8.22$ & $54.51 \pm 8.23$ \\
-Image-level+Aug & DINOv1 GAP Aug & $49.29 \pm 10.08$ \loss{10.95} & $47.34 \pm 9.99$ \loss{12.15} & $49.30 \pm 7.28$ \loss{7.87} & $45.33 \pm 6.83$ \loss{9.18} \\
-Sparse MIL & DINOv1 MIL & $90.71 \pm 0.91$ \gain{30.48} & $90.55 \pm 1.13$ \gain{31.05} & $92.83 \pm 3.49$ \gain{35.66} & $91.16 \pm 4.52$ \gain{36.65} \\
-Sparse DepthAug & DINOv1 DepthAug & $88.57 \pm 0.87$ \gain{28.33} & $88.37 \pm 0.95$ \gain{28.88} & $94.06 \pm 1.46$ \gain{36.89} & $92.87 \pm 1.73$ \gain{38.36} \\
+Image-level & DINOv1 GAP & $80.48$ & $80.26$ & $66.43$ & $64.72$ \\
+Image-level+Aug & DINOv1 GAP Aug & $90.95$ \gain{10.48} & $90.84$ \gain{10.59} & $68.53$ \gain{2.10} & $66.75$ \gain{2.03} \\
+Sparse MIL & DINOv1 MIL & $91.43$ \gain{10.95} & $91.44$ \gain{11.18} & $90.21$ \gain{23.78} & $88.09$ \gain{23.38} \\
+Sparse DepthAug & DINOv1 DepthAug & $88.10$ \gain{7.62} & $88.05$ \gain{7.79} & $92.31$ \gain{25.87} & $90.50$ \gain{25.79} \\
 \midrule
-Image-level & DINOv2 GAP & $41.31 \pm 3.70$ & $39.50 \pm 4.28$ & $45.45 \pm 3.33$ & $42.58 \pm 3.22$ \\
-Image-level+Aug & DINOv2 GAP Aug & $41.67 \pm 0.99$ \gain{0.36} & $41.34 \pm 1.35$ \gain{1.84} & $43.71 \pm 3.26$ \loss{1.75} & $40.59 \pm 3.14$ \loss{1.99} \\
-Sparse MIL & DINOv2 MIL & $92.50 \pm 1.67$ \gain{51.19} & $92.52 \pm 1.66$ \gain{53.02} & $92.13 \pm 2.16$ \gain{46.68} & $90.54 \pm 2.65$ \gain{47.96} \\
-Sparse DepthAug & DINOv2 DepthAug & $93.81 \pm 2.37$ \gain{52.50} & $93.87 \pm 2.39$ \gain{54.37} & $94.93 \pm 2.31$ \gain{49.48} & $94.13 \pm 2.74$ \gain{51.55} \\
+Image-level & DINOv2 GAP & $92.38$ & $92.34$ & $78.32$ & $76.27$ \\
+Image-level+Aug & DINOv2 GAP Aug & $92.86$ \gain{0.48} & $92.76$ \gain{0.42} & $79.02$ \gain{0.70} & $78.45$ \gain{2.18} \\
+Sparse MIL & DINOv2 MIL & $93.33$ \gain{0.95} & $93.27$ \gain{0.93} & $92.31$ \gain{13.99} & $91.12$ \gain{14.85} \\
+Sparse DepthAug & DINOv2 DepthAug & $\mathbf{96.19}$ \gain{3.81} & $\mathbf{96.21}$ \gain{3.87} & $91.61$ \gain{13.29} & $90.13$ \gain{13.85} \\
 \midrule
-Image-level & DINOv3 GAP & $\mathbf{97.62 \pm 1.03}$ & $\mathbf{97.60 \pm 1.04}$ & $86.71 \pm 0.99$ & $84.67 \pm 0.89$ \\
-Image-level+Aug & DINOv3 GAP Aug & $95.24 \pm 1.23$ \loss{2.38} & $95.25 \pm 1.26$ \loss{2.34} & $87.94 \pm 2.01$ \gain{1.22} & $86.88 \pm 1.73$ \gain{2.21} \\
-Sparse MIL & DINOv3 MIL & $83.33 \pm 2.06$ \loss{14.29} & $83.15 \pm 2.06$ \loss{14.45} & $88.46 \pm 1.85$ \gain{1.75} & $87.76 \pm 1.84$ \gain{3.09} \\
-Sparse DepthAug & DINOv3 DepthAug & $86.55 \pm 0.81$ \loss{11.07} & $86.54 \pm 0.77$ \loss{11.06} & $91.26 \pm 1.46$ \gain{4.55} & $90.33 \pm 1.27$ \gain{5.66} \\
+Image-level & DINOv3 GAP & $84.29$ & $84.27$ & $60.84$ & $57.05$ \\
+Image-level+Aug & DINOv3 GAP Aug & $89.05$ \gain{4.76} & $89.05$ \gain{4.78} & $67.83$ \gain{6.99} & $65.76$ \gain{8.72} \\
+Sparse MIL & DINOv3 MIL & $85.24$ \gain{0.95} & $85.08$ \gain{0.81} & $90.21$ \gain{29.37} & $88.84$ \gain{31.79} \\
+Sparse DepthAug & DINOv3 DepthAug & $86.19$ \gain{1.90} & $86.19$ \gain{1.92} & $93.01$ \gain{32.17} & $91.85$ \gain{34.80} \\
 \midrule
-Image-level & Swin GAP & $97.14 \pm 1.69$ & $97.09 \pm 1.74$ & $89.34 \pm 0.67$ & $87.10 \pm 1.22$ \\
-Image-level+Aug & Swin GAP Aug & $95.12 \pm 1.06$ \loss{2.02} & $95.09 \pm 1.04$ \loss{2.00} & $87.76 \pm 3.54$ \loss{1.57} & $86.57 \pm 3.64$ \loss{0.53} \\
-Sparse MIL & Swin MIL & $80.60 \pm 2.73$ \loss{16.55} & $80.51 \pm 2.64$ \loss{16.58} & $89.69 \pm 1.93$ \gain{0.35} & $87.61 \pm 2.22$ \gain{0.51} \\
-Sparse DepthAug & Swin DepthAug & $84.40 \pm 0.81$ \loss{12.74} & $84.31 \pm 0.90$ \loss{12.78} & $93.18 \pm 1.55$ \gain{3.85} & $91.89 \pm 2.08$ \gain{4.79} \\
+Image-level & Swin GAP & $80.48$ & $79.50$ & $68.53$ & $66.12$ \\
+Image-level+Aug & Swin GAP Aug & $83.33$ \gain{2.86} & $82.60$ \gain{3.10} & $68.53$ \gain{0.00} & $66.68$ \gain{0.57} \\
+Sparse MIL & Swin MIL & $83.81$ \gain{3.33} & $83.46$ \gain{3.96} & $88.81$ \gain{20.28} & $85.78$ \gain{19.66} \\
+Sparse DepthAug & Swin DepthAug & $84.29$ \gain{3.81} & $84.15$ \gain{4.65} & $91.61$ \gain{23.08} & $89.75$ \gain{23.63} \\
 \bottomrule
 \end{tabular}}
 \end{table*}
@@ -280,100 +480,184 @@ Sparse DepthAug & Swin DepthAug & $84.40 \pm 0.81$ \loss{12.74} & $84.31 \pm 0.9
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig15_overall_comparison_selected.png}
-\caption{Representative four-seed macro-$F_1$ comparison. Gray bars indicate image-level GAP baselines, blue bars indicate sparse MIL, and orange bars indicate sparse MIL with DepthAug.}
+\caption{Representative seed-42 macro-$F_1$ comparison. Gray bars indicate image-level GAP baselines, blue bars indicate sparse MIL, and orange bars indicate sparse MIL with DepthAug.}
 \label{fig:overall_rank}
 \end{figure*}
 
 \subsection{Effect of Depth-Guided Augmentation}
-DepthAug is most effective on UrbanStreetTree. Relative to the corresponding sparse MIL model, paired-seed macro-$F_1$ improvements are +3.74 percentage points for ViT, +3.59 for DINOv2, +2.57 for DINOv3, and +4.28 for Swin. This supports the interpretation that training-time background perturbation is useful in street scenes where background shortcuts are severe.
+DepthAug is more clearly beneficial on UrbanStreetTree than on FruitsPark. Relative to the corresponding sparse MIL model at seed 42, macro-$F_1$ changes are +2.60 percentage points for ViT, +2.41 for DINOv1, -0.99 for DINOv2, +3.01 for DINOv3, and +3.97 for Swin. This supports the interpretation that training-time background perturbation can be useful in street scenes where background shortcuts are severe, while also showing that the gain is not uniform across all backbones.
 
-On FruitsPark, the effect is mixed. DINOv2 and ViT gain from DepthAug, but DINOv1 and DINOv3 do not. This difference is important for interpretation: FruitsPark is a validation-only dataset collected in a specific park environment, and strong image-level foundation models may benefit from stable domain regularities. We therefore use FruitsPark as a secondary validation of the method's behavior rather than as the sole basis for a superiority claim.
+On FruitsPark, the effect is mixed. DINOv2 gains +2.94 percentage points in macro-$F_1$, while ViT is essentially unchanged and DINOv1 decreases. This difference is important for interpretation: FruitsPark is a validation-only dataset collected in a specific park environment, and strong image-level foundation models may benefit from stable domain regularities. We therefore use FruitsPark as a secondary validation of the method's behavior rather than as the sole basis for a superiority claim.
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig16_depth_aug_delta_submission.png}
-\caption{DepthAug delta relative to corresponding sparse MIL models. The effect is consistently positive on UrbanStreetTree and dataset-dependent on FruitsPark.}
+\caption{DepthAug delta relative to corresponding sparse MIL models at seed 42. The effect is generally positive on UrbanStreetTree and dataset-dependent on FruitsPark.}
 \label{fig:depth_delta}
 \end{figure*}
 
 \subsection{Sparse-Selection Ablation}
-The fixed-budget condition ablation in Fig.~\ref{fig:condition_ablation} compares whether sparse inference alone is sufficient and whether TBS and DepthAug improve over random sparse training. On FruitsPark, full training and full evaluation reach 88.6\% accuracy in this protocol. Switching to full training with sparse evaluation reduces accuracy to 78.9\%, showing that reducing the evaluation budget alone is not sufficient. Random sparse training/evaluation reaches 76.3\%, TBS sparse training/evaluation reaches 78.2\%, and TBS sparse with DepthAug improves to 85.0\%. On UrbanStreetTree, full training/full evaluation reaches 94.2\%, while full training/sparse evaluation, random sparse, TBS sparse, and TBS sparse with DepthAug reach 90.4\%, 88.3\%, 89.7\%, and 91.3\%, respectively. Thus, at a fixed sparse budget, TBS gives a modest gain over random sparse sampling, and DepthAug provides the largest additional gain. Full-patch processing remains a strong reference, but the gap is substantially reduced by combining sparse selection with training-time background perturbation.
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=\textwidth]{figures/fig18_condition_ablation.png}
-\caption{Fixed-budget condition ablation comparing full processing, sparse evaluation, random sparse training/evaluation, TBS sparse training/evaluation, and TBS sparse training with DepthAug.}
-\label{fig:condition_ablation}
-\end{figure*}
-
-\subsection{Pareto Efficiency of Sparse Patch Selection}
-Table~\ref{tab:pareto} summarizes the Pareto efficiency experiment. On FruitsPark, the best accuracy is obtained at $\rho=1.0$, with 96.79\% accuracy and 66.0 instances. The efficient point within one percentage point of the best result is $\rho=0.8$, which uses 53.0 instances and loses only 0.71 percentage points. On UrbanStreetTree, the best accuracy is obtained at $\rho=0.9$, with 96.33\% accuracy and 367.2 instances. The efficient point is $\rho=0.4$, which reaches 95.98\% accuracy and 95.22\% macro-$F_1$ with only 163.3 instances, losing 0.35 percentage points while using about 44.5\% of the instances used by the best-accuracy setting.
+The fixed-budget sparse-selection diagnostic in Table~\ref{tab:sampling_seed_ablation} and Fig.~\ref{fig:sampling_seed_comparison} tests whether TBS is useful beyond patch-count reduction alone. This experiment fixes the learning seed and varies the seed-controlled sparse sampling over four values, 42--45. The full train/full evaluation condition is available for all four seeds on UrbanStreetTree, but only as a seed-42 reference on FruitsPark, so the FruitsPark full-patch row should not be interpreted as a stable replicated baseline.
 
 \begin{table*}[t]
 \centering
-\caption{Pareto efficiency summary for TBS sparse MIL with DepthAug.}
+\caption{Fixed-budget sparse-selection diagnostic with seed-controlled sampling. Accuracy and macro-$F_1$ are percentages. Epoch time is reported in minutes.}
+\label{tab:sampling_seed_ablation}
+\scriptsize
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llcccccc}
+\toprule
+Dataset & Method & Seeds & Accuracy & Macro-$F_1$ & Epoch time & Instances & Interpretation \\
+\midrule
+FruitsPark & Full train / full eval & 1 & 81.43 & 80.85 & 2.53 & 66.0 & Full-patch reference only \\
+FruitsPark & Full train / sparse eval & 4 & $71.19\pm2.38$ & $70.99\pm2.82$ & 2.41 & 20.0 & Sparse evaluation alone degrades \\
+FruitsPark & Random sparse & 4 & $72.38\pm4.38$ & $71.36\pm5.00$ & 1.15 & 20.0 & Patch-count baseline \\
+FruitsPark & TBS sparse & 4 & $77.38\pm3.86$ & $76.79\pm4.26$ & 1.16 & 20.0 & +5.00 pp over random \\
+FruitsPark & TBS sparse + DepthAug & 4 & $\mathbf{87.14\pm2.02}$ & $\mathbf{87.06\pm2.05}$ & 2.21 & 20.0 & Best and most stable \\
+\midrule
+UrbanStreetTree & Full train / full eval & 4 & $91.61\pm2.55$ & $90.47\pm2.92$ & 15.81 & 407.8 & Strong full-patch reference \\
+UrbanStreetTree & Full train / sparse eval & 4 & $88.46\pm5.12$ & $86.74\pm6.28$ & 15.48 & 122.7 & Sparse evaluation alone unstable \\
+UrbanStreetTree & Random sparse & 4 & $89.69\pm3.85$ & $88.11\pm3.95$ & 7.11 & 122.7 & Competitive sparse baseline \\
+UrbanStreetTree & TBS sparse & 4 & $\mathbf{91.96\pm1.34}$ & $\mathbf{90.43\pm1.76}$ & 7.06 & 122.7 & Best replicated sparse condition \\
+UrbanStreetTree & TBS sparse + DepthAug & 4 & $88.64\pm3.49$ & $87.01\pm3.52$ & 13.67 & 122.7 & Dataset-dependent decrease \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+On FruitsPark, TBS improves over random sparse sampling by 5.00 percentage points in accuracy, and adding DepthAug gives a further 9.76 percentage-point gain over plain TBS. TBS sparse with DepthAug wins under all four sampling seeds. On UrbanStreetTree, plain TBS is the strongest replicated sparse condition, reaching $91.96\pm1.34$\% accuracy while using 0.45$\times$ the epoch time of full train/full evaluation. Random sparse sampling is competitive for one seed, but TBS gives the best mean and the lowest standard deviation. DepthAug decreases performance in this particular sampling-seed diagnostic, despite improving most backbones in the seed-42 overall comparison. We therefore interpret DepthAug as a useful but dataset- and protocol-dependent regularizer rather than as a uniformly beneficial component.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig24_sampling_seed_comparison.png}
+\caption{Fixed-budget sparse-selection diagnostic under four seed-controlled sampling settings. TBS improves over random sparse sampling on average, while the contribution of DepthAug differs between FruitsPark and UrbanStreetTree.}
+\label{fig:sampling_seed_comparison}
+\end{figure*}
+
+\subsection{Pareto Efficiency of Sparse Patch Selection}
+Table~\ref{tab:pareto} summarizes the seed-42 Pareto efficiency experiment. On FruitsPark, the best accuracy is obtained at $\rho=1.0$, with 97.62\% accuracy and 66.0 instances. The efficient point within one percentage point of the best result is $\rho=0.8$, which uses 53.0 instances and loses 0.95 percentage points. On UrbanStreetTree, the best accuracy is obtained at $\rho=0.7$ and $\rho=0.9$; we report $\rho=0.7$ as the lower-cost best point, with 97.90\% accuracy and 285.1 instances. The efficient point is $\rho=0.6$, which reaches 97.20\% accuracy and 96.49\% macro-$F_1$ with 244.5 instances, losing 0.70 percentage points while using about 85.8\% of the instances used by the lower-cost best-accuracy setting. The Pareto result should therefore be read as a practical operating-point analysis rather than a claim that the smallest bag is always optimal.
+
+\begin{table*}[t]
+\centering
+\caption{Seed-42 Pareto efficiency summary for TBS sparse MIL with DepthAug.}
 \label{tab:pareto}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{llccccc}
 \toprule
 Dataset & Choice & Bag ratio & Accuracy (\%) & Macro-$F_1$ (\%) & Instances & Gap to best (pp) \\
 \midrule
-FruitsPark & Best accuracy & 1.0 & $96.79 \pm 1.57$ & 96.79 & 66.0 & 0.00 \\
-FruitsPark & Efficient within 1pp & 0.8 & $96.07 \pm 2.76$ & 96.01 & 53.0 & 0.71 \\
-UrbanStreetTree & Best accuracy & 0.9 & $96.33 \pm 1.84$ & 95.83 & 367.2 & 0.00 \\
-UrbanStreetTree & Efficient within 1pp & 0.4 & $95.98 \pm 0.88$ & 95.22 & 163.3 & 0.35 \\
+FruitsPark & Best accuracy & 1.0 & 97.62 & 97.59 & 66.0 & 0.00 \\
+FruitsPark & Efficient within 1pp & 0.8 & 96.67 & 96.60 & 53.0 & 0.95 \\
+UrbanStreetTree & Best accuracy & 0.7 & 97.90 & 97.72 & 285.1 & 0.00 \\
+UrbanStreetTree & Efficient within 1pp & 0.6 & 97.20 & 96.49 & 244.5 & 0.70 \\
 \bottomrule
 \end{tabular}}
 \end{table*}
 
-Fig.~\ref{fig:random_ratio_stability} compares the proposed TBS-DepthAug ratio sweep with random sparse sampling using mean and standard deviation over four seeds. Random sparse sampling is a strong stochastic baseline: because it can occasionally include highly informative patches, it can match or exceed the proposed method at isolated patch budgets. However, its performance is less stable across the ratio sweep, and unfavorable samples can produce noticeably weaker results. On FruitsPark, random sparse peaks at $\rho=0.6$ and then degrades as more random patches are added, and on UrbanStreetTree it peaks at $\rho=0.3$ before dropping at nearby ratios. The proposed method does not dominate random sampling at every budget, but it reaches the highest observed mean accuracy on both datasets and forms a more reliable high-performance region in the ratio sweep. This supports the interpretation that the contribution is not patch-count reduction alone, but more stable structure-biased sparse selection combined with depth-guided training-time perturbation.
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=\textwidth]{figures/fig20_random_performance_by_ratio.png}
-\caption{Proposed TBS-DepthAug versus random sparse sampling across bag ratios. Markers show four-seed means and error bars show standard deviations. Random sparse sampling is competitive at some isolated ratios, but its performance is more ratio-dependent; the proposed method gives the highest observed mean accuracy on both datasets while maintaining a more stable high-performance region.}
-\label{fig:random_ratio_stability}
-\end{figure*}
-
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig17_pareto_frontier_submission.png}
-\caption{Patch-budget Pareto frontier for TBS sparse MIL with DepthAug. Circles mark the best-accuracy settings and squares mark the efficient settings within one percentage point of the best accuracy.}
+\caption{Seed-42 patch-budget Pareto frontier for TBS sparse MIL with DepthAug. Circles mark the best-accuracy settings and squares mark the efficient settings within one percentage point of the best accuracy.}
 \label{fig:pareto_overview}
 \end{figure*}
 
+Because UrbanStreetTree provides segmentation masks for the test split, we further diagnose whether sparse bags preserve foreground tree evidence. Fig.~\ref{fig:foreground_diagnostics} reports foreground coverage and patch--foreground IoU across bag ratios. Foreground coverage increases monotonically as $\rho$ grows: the efficient $\rho=0.6$ setting covers 76.4\% of annotated foreground pixels, while the lower-cost best-accuracy setting $\rho=0.7$ covers 84.3\% and full selection covers 99.2\%. However, full selection does not give the best accuracy in Table~\ref{tab:pareto}, and patch--foreground IoU saturates around 9--10\%. This indicates that sparse MIL benefits from covering enough tree structure, but maximizing foreground coverage alone is not sufficient; additional patches can introduce redundant or background-dominant evidence that ABMIL must suppress.
+
 \begin{figure*}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig19_random_vs_proposed_efficiency.png}
-\caption{Patch-efficiency curves comparing the proposed TBS-DepthAug configuration with random sparse sampling across bag ratios.}
-\label{fig:random_efficiency}
+\includegraphics[width=\textwidth]{figures/fig19_foreground_diagnostics_by_ratio.png}
+\caption{UrbanStreetTree foreground diagnostics across sparse bag ratios using segmentation masks. Coverage increases with the bag ratio, while foreground IoU saturates, showing that useful sparse operation requires enough foreground coverage without simply processing all patches.}
+\label{fig:foreground_diagnostics}
+\end{figure*}
+
+\subsection{Learning Efficiency}
+Table~\ref{tab:learning_efficiency} and Fig.~\ref{fig:learning_efficiency} summarize the four-seed learning-efficiency analysis for DINOv2 TBS sparse MIL with DepthAug. This analysis compares the full-patch setting ($\rho=1.0$) with the sparse setting used in the fixed-budget MIL protocol ($\rho=0.3$), using validation accuracy, time-to-best, and the estimated number of processed training patches up to the best validation epoch.
+
+On UrbanStreetTree, $\rho=0.3$ reaches $99.50\pm0.34$\% best validation accuracy, slightly above the full-patch result of $99.16\pm0.34$\%, while reducing time-to-best from $304.5\pm57.1$ min to $98.6\pm41.3$ min. This corresponds to a 67.6\% reduction in time-to-best and a 73.0\% reduction in processed patches at the best epoch. The time required to reach 95\% of the same-seed full-patch best accuracy also decreases from 54.3 min to 26.9 min.
+
+FruitsPark shows a clearer accuracy--efficiency tradeoff. At $\rho=0.3$, best validation accuracy decreases from $96.79\pm1.57$\% to $94.76\pm3.32$\%, but time-to-best decreases by 54.6\% and processed patches decrease by 68.1\%. Thus, the sparse setting should not be described as accuracy-neutral on FruitsPark; it is useful as an efficient operating point when modest accuracy loss is acceptable.
+
+\begin{table*}[t]
+\centering
+\caption{Four-seed learning-efficiency comparison for DINOv2 TBS sparse MIL with DepthAug. Time-to-target is the mean time required to reach 95\% of the same-seed full-patch best validation accuracy; all four seeds reached this target in each row.}
+\label{tab:learning_efficiency}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+Dataset & Bag ratio & Best val acc (\%) & Time@best (min) & Patches@best (M) & Time to target (min) & Efficiency interpretation \\
+\midrule
+FruitsPark & 0.3 & $94.76\pm3.32$ & $16.6\pm1.7$ & $0.58\pm0.06$ & 9.7 & $-$2.03 pp, $-$54.6\% time, $-$68.1\% patches \\
+FruitsPark & 1.0 & $96.79\pm1.57$ & $36.6\pm4.7$ & $1.82\pm0.25$ & 9.6 & Full-patch reference \\
+UrbanStreetTree & 0.3 & $99.50\pm0.34$ & $98.6\pm41.3$ & $5.12\pm2.22$ & 26.9 & $+$0.34 pp, $-$67.6\% time, $-$73.0\% patches \\
+UrbanStreetTree & 1.0 & $99.16\pm0.34$ & $304.5\pm57.1$ & $18.98\pm3.42$ & 54.3 & Full-patch reference \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig21_learning_efficiency_main.png}
+\caption{Four-seed learning-efficiency curves for DINOv2 TBS sparse MIL with DepthAug. Wall-clock time and estimated processed patches provide more direct efficiency comparisons than epoch count alone because sparse bags process fewer instances per epoch.}
+\label{fig:learning_efficiency}
+\end{figure*}
+
+\subsection{Inference Efficiency}
+Table~\ref{tab:inference_efficiency} reports end-to-end inference timing for the same DINOv2 sparse MIL family. The benchmark includes patch generation and selection, GPU transfer, feature extraction, and MIL aggregation, so it is a deployment-oriented measurement rather than a backbone-only timing proxy.
+
+Compared with full-patch inference, proposed sparse inference reduces latency from $115.27\pm5.48$ ms/image to $68.68\pm0.98$ ms/image on FruitsPark, a 1.68$\times$ speedup and a 40.4\% latency reduction. Peak GPU memory decreases by 18.5\%, from 242.0 MB to 197.3 MB, while final accuracy decreases by 2.02 percentage points. On UrbanStreetTree, proposed sparse inference reduces latency from $608.30\pm20.55$ ms/image to $410.40\pm25.57$ ms/image, a 1.48$\times$ speedup and a 32.5\% latency reduction. Peak GPU memory decreases by 48.8\%, from 592.7 MB to 303.7 MB, while the accuracy drop is 0.70 percentage points.
+
+Fig.~\ref{fig:inference_breakdown} explains why the realized speedup is smaller than the patch-count reduction. Sparse inference substantially reduces the model-forward component, from 27.6 ms to 11.0 ms on FruitsPark and from 136.9 ms to 46.9 ms on UrbanStreetTree. However, patch preparation and TBS selection remain the dominant cost, especially on UrbanStreetTree. Random sparse sampling is faster because it avoids the proposed tree-focused selection cost, but it is used here only as an overhead diagnostic; the main comparison is between full-patch inference and the proposed structurally biased sparse inference.
+
+\begin{table*}[t]
+\centering
+\caption{Four-seed end-to-end inference-efficiency comparison. Accuracy is final validation accuracy for FruitsPark and final test accuracy for UrbanStreetTree.}
+\label{tab:inference_efficiency}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llccccc}
+\toprule
+Dataset & Method & Bag ratio & Final acc (\%) & Latency / image (ms) & Speedup & Peak GPU mem (MB) \\
+\midrule
+FruitsPark & Full Patch & 1.0 & $96.79\pm1.57$ & $115.27\pm5.48$ & 1.00$\times$ & $242.0\pm1.4$ \\
+FruitsPark & Proposed Sparse & 0.3 & $94.76\pm3.32$ & $68.68\pm0.98$ & 1.68$\times$ & $197.3\pm0.0$ \\
+UrbanStreetTree & Full Patch & 1.0 & $94.76\pm1.85$ & $608.30\pm20.55$ & 1.00$\times$ & $592.7\pm0.5$ \\
+UrbanStreetTree & Proposed Sparse & 0.3 & $94.06\pm1.46$ & $410.40\pm25.57$ & 1.48$\times$ & $303.7\pm0.0$ \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig22_inference_latency_breakdown.png}
+\caption{Inference latency breakdown. Sparse patch usage reduces model-forward time, but the overall speedup is partly limited by patch preparation and structurally biased selection overhead.}
+\label{fig:inference_breakdown}
 \end{figure*}
 
 \subsection{Qualitative Attention Behavior}
-Attention visualizations can be useful diagnostics for checking whether high-weight patches correspond to trunks, branches, or background regions. However, attention weights should not be treated as causal explanations by themselves \cite{attentionnotexplanation}. For this reason, we use attention behavior only as supporting diagnostic evidence and base the main claims on the four-seed quantitative comparison and Pareto analysis. Selected-patch visualizations are most informative when generated from the exact TBS-DepthAug setting used in the quantitative experiments; visualizations from earlier internal variants are therefore not used as primary evidence.
+Attention visualizations can be useful diagnostics for checking whether high-weight patches correspond to trunks, branches, or background regions. However, attention weights should not be treated as causal explanations by themselves \cite{attentionnotexplanation}. For this reason, we use attention behavior only as supporting diagnostic evidence and base the main claims on the seed-42 quantitative comparison, the Pareto analysis, the fixed-budget multi-seed diagnostic, and the measured efficiency analyses. Selected-patch visualizations are most informative when generated from the exact TBS-DepthAug setting used in the quantitative experiments; visualizations from earlier internal variants are therefore not used as primary evidence.
 
 \section{Discussion}
 \label{sec:discussion}
 
 \subsection{Why Sparse MIL Helps}
-Mid-range tree classification requires the model to preserve fine local evidence while reasoning over the entire object structure. Standard image-level resizing can dilute trunk and bark information, especially when the tree occupies a small region. ABMIL avoids forcing the whole image into one global descriptor; it lets the model assign weights to local patches. TBS makes this practical by reducing the number of instances and biasing the bag toward structural patches before feature extraction. The random-comparison experiment also shows that random sparse sampling is not a weak baseline: by chance, it can select useful patches and become competitive at some ratios. The value of TBS-DepthAug is therefore not that it dominates random sampling at every patch budget, but that it reduces dependence on favorable random draws, improves the fixed sparse condition, and produces higher best-accuracy points while retaining a practical sparse operating point.
+Mid-range tree classification requires the model to preserve fine local evidence while reasoning over the entire object structure. Standard image-level resizing can dilute trunk and bark information, especially when the tree occupies a small region. ABMIL avoids forcing the whole image into one global descriptor; it lets the model assign weights to local patches. TBS makes this practical by reducing the number of instances and biasing the bag toward structural patches before feature extraction. The preliminary and fixed-budget diagnostics show that sparse sampling alone is not sufficient to explain the gains: random sparse sampling can be competitive, but TBS provides a deterministic structural prior and improves the replicated sparse-selection mean on both datasets. The filter-response diagnostic further explains why Sobel scoring is appropriate for TBS: after depth-guided background perturbation, Sobel still preserves trunk and branch contours while many background edges are suppressed.
 
-\subsection{Why DepthAug Helps on UrbanStreetTree}
-UrbanStreetTree contains complex street backgrounds and an independent test split, making it a strong setting for evaluating background shortcut suppression. The consistent DepthAug gains across backbones suggest that perturbing depth-derived background regions during training prevents the classifier from relying on scene context alone. Importantly, DepthAug does not impose a depth sensor requirement at inference, which is essential for mobile and low-cost deployment.
+\subsection{Dataset-Dependent Role of DepthAug}
+UrbanStreetTree contains complex street backgrounds and a separate test split, making it a relevant setting for evaluating background shortcut suppression. At the same time, the dataset analysis shows that source-group and background cues remain predictive, so the split should not be treated as a strict location- or individual-tree holdout. The seed-42 backbone comparison shows that DepthAug improves most sparse MIL backbones on UrbanStreetTree, suggesting that perturbing depth-derived background regions can reduce reliance on scene context. However, the sampling-seed diagnostic shows that this benefit is not unconditional: under the fixed ViT sparse-selection protocol, plain TBS is more stable than TBS with DepthAug on UrbanStreetTree. We therefore treat DepthAug as a training-time regularizer whose value depends on backbone, dataset, and sampling protocol, rather than as a universally accuracy-improving operation. Importantly, DepthAug does not impose a depth sensor requirement at inference, which is essential for mobile and low-cost deployment.
 
 \subsection{Dataset-Dependent Behavior}
-FruitsPark shows a different pattern: DINOv3 GAP is the best overall method, and DepthAug does not improve all backbones. This does not invalidate the proposed framework. Instead, it indicates that the benefit of sparse depth-regularized MIL depends on dataset structure, split design, and background variability. Because FruitsPark has no independent test set, validation performance may reflect collection-domain regularities. Future work should add a held-out location or season split to measure generalization more rigorously.
+FruitsPark shows a different pattern: DINOv2 DepthAug is the best seed-42 configuration, but DepthAug does not improve all backbones. This does not invalidate the proposed framework. Instead, it indicates that the benefit of sparse depth-regularized MIL depends on dataset structure, split design, and background variability. Because FruitsPark has no independent test set and both datasets show source-group correlations across splits, validation and test performance may partly reflect collection-domain regularities. Future work should add held-out location, season, acquisition-series, or individual-tree splits to measure generalization more rigorously.
 
 \subsection{Efficiency Interpretation}
-The Pareto results are central to the practical value of the method. In UrbanStreetTree, using 40\% of candidate patches retains accuracy within 0.35 percentage points of the best setting while reducing average instances from 367.2 to 163.3. The random sparse baseline reaches a similar range, but its best point is slightly lower than the proposed method. This indicates that sparse patch processing itself is important, while TBS and DepthAug provide additional gains in the high-performance region. This does not yet equal a complete latency claim because preprocessing, patch scoring, GPU batching, and feature extraction overhead must be measured end-to-end. However, average instances are a direct and reproducible proxy for encoder workload, and the observed frontier shows that processing all patches is unnecessary for near-peak accuracy.
+The Pareto results are central to the practical value of the method. In UrbanStreetTree, using 60\% of candidate patches retains accuracy within 0.70 percentage points of the lower-cost best setting while reducing average instances from 285.1 to 244.5. The foreground diagnostic gives an additional interpretation: this setting already covers more than three quarters of annotated foreground pixels, while increasing the bag to all patches yields nearly complete foreground coverage without improving accuracy. In FruitsPark, using 80\% of candidate patches remains within one percentage point of the best result while reducing average instances from 66.0 to 53.0.
+
+The multi-seed efficiency analysis extends this patch-budget result to wall-clock behavior. At $\rho=0.3$, UrbanStreetTree retains or slightly improves best validation accuracy while reducing time-to-best by 67.6\% and processed patches by 73.0\%. FruitsPark shows the expected tradeoff: the same sparse ratio reduces time-to-best by 54.6\% and processed patches by 68.1\%, but best validation accuracy decreases by 2.03 percentage points. End-to-end inference timing confirms that sparse operation also reduces deployment cost, with latency reductions of 40.4\% on FruitsPark and 32.5\% on UrbanStreetTree and peak-memory reductions of 18.5\% and 48.8\%, respectively. The latency breakdown also exposes the main remaining bottleneck: TBS reduces model-forward time, but patch preparation and selection dominate the total runtime. This suggests that caching patch coordinates, vectorizing selection, or using a lightweight learned selector could improve deployment speed without changing the MIL formulation.
 
 \subsection{Limitations}
-This study has four main limitations. First, FruitsPark lacks an independent test set. Second, the current TBS score is a hand-designed Sobel measure; learnable or class-aware patch selection may improve robustness. Third, pseudo-depth maps can fail in cluttered vegetation or unusual lighting. Fourth, this paper reports patch-instance efficiency rather than a complete deployment latency benchmark. Future experiments should include held-out locations, end-to-end timing, confidence-aware depth augmentation, and direct comparisons with recent learned efficient MIL selectors.
+This study has several limitations. First, FruitsPark lacks an independent test set, and the dataset analysis indicates source-group correlations across the available splits. Second, the current TBS score is a hand-designed Sobel measure; learnable or class-aware patch selection may improve robustness. Third, pseudo-depth maps can fail in cluttered vegetation or unusual lighting. Fourth, the inference benchmark was run on a workstation GPU and measured 50 images per run, so deployment on mobile or embedded hardware still requires separate profiling. Future experiments should include held-out locations, acquisition-series splits, hardware-diverse timing, confidence-aware depth augmentation, and direct comparisons with recent learned efficient MIL selectors.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-This paper presented a depth-regularized sparse MIL framework for mid-range tree species classification under background-dominant conditions. The method represents each image as a sparse bag of structurally informative patches, aggregates patch evidence with ABMIL, and uses depth-guided augmentation during training to reduce background shortcuts while preserving RGB-only inference. Fixed-budget four-seed experiments showed strong gains on UrbanStreetTree, where ViT DepthAug achieved 95.10\% accuracy and 94.27\% macro-$F_1$. Fixed-budget ablations showed that TBS and DepthAug improve sparse training relative to random sparse sampling, while ratio-wise comparisons showed that random sparse sampling remains a strong baseline. Pareto analysis demonstrated that near-peak performance can be retained with fewer patch instances, especially on UrbanStreetTree, where a 0.4 bag ratio remained within 0.35 percentage points of the best result while using less than half as many instances. These findings support sparse, depth-regularized weakly supervised aggregation as a practical direction for ground-level tree recognition in complex real-world scenes.
+This paper presented a depth-regularized sparse MIL framework for mid-range tree species classification under background-dominant conditions. The method represents each image as a sparse bag of structurally informative patches, aggregates patch evidence with ABMIL, and uses depth-guided augmentation during training to reduce background shortcuts while preserving RGB-only inference. Dataset diagnostics showed that background-only and acquisition-context probes can be strongly predictive under the available splits, motivating explicit background-aware evaluation. Depth-source screening selected MiDaS Hybrid as the standard pseudo-depth model because it achieved the best UrbanStreetTree test result among the evaluated depth-inferred augmentations. Fixed-budget seed-42 experiments showed strong UrbanStreetTree performance, where ViT DepthAug achieved 95.80\% accuracy and 95.00\% macro-$F_1$. A retained sampling-seed diagnostic showed that TBS improves replicated sparse training relative to random sparse sampling on average, while the additional effect of DepthAug is dataset- and protocol-dependent. Pareto analysis demonstrated that near-peak performance can be retained with fewer patch instances, especially on UrbanStreetTree, where a 0.6 bag ratio remained within 0.70 percentage points of the lower-cost best result while reducing average instances from 285.1 to 244.5. Additional multi-seed efficiency analysis showed that $\rho=0.3$ substantially reduces time-to-best and processed patches, with the strongest accuracy-preserving result on UrbanStreetTree. End-to-end inference benchmarks further showed lower latency and lower GPU memory than full-patch inference, although patch preparation and selection overhead limits the realized speedup. These findings support sparse, depth-regularized weakly supervised aggregation as a practical direction for ground-level tree recognition in complex real-world scenes.
 
 \begin{thebibliography}{00}
 
