@@ -22,3 +22,4 @@ IEEE_ACCESS.zip
 
 # Large raw experiment outputs (not tracked: too large for git)
 new_experiments_result/
+IEEE_ACCESS/raw_figures/
