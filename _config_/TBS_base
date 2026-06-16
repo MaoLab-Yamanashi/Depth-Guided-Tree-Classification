@@ -1,0 +1,80 @@
+# TBS Base Policy
+
+## 1. 位置づけ
+
+本メモは、今後の TBS 関連実験で共通に採用する基本方針を整理したものである。
+
+ここでは「何を本線の標準設定として置くか」を定める。
+個別の最適化実験や TBS の有無比較は別ファイルで扱う。
+
+---
+
+## 2. 基本方針
+
+TBS 系の検証では、まず以下を本線候補の固定条件とする。
+
+- backbone: `vit_small_patch16_224`
+- attention: `softmax`
+- regularization: `elastic_net_balanced`
+- score method: `sobel`
+
+---
+
+## 3. 採用理由
+
+### attention: `softmax`
+
+- ABMIL の標準設定として最も自然である
+- 比較の基準として説明しやすい
+- ablation では `topk(20%)` も良好だったが、補足的条件として扱う方が妥当である
+
+### regularization: `elastic_net_balanced`
+
+- 正則化比較の中で、最高 validation 精度だけでなく終盤の安定性も良好だった
+- `L1` と `L2` を弱く併用するため、極端な sparsity 偏重にも smoothing 偏重にもなりにくい
+
+### score method: `sobel`
+
+- score 関数比較の中で、`lapvar` や `hpf` よりも安定して良好だった
+- 最終精度と終盤平均の両方で比較的良い傾向を示した
+
+---
+
+## 4. sampling に関する方針
+
+sampling だけは、まだ本線の標準を確定しない。
+
+理由は以下の通りである。
+
+- `random` が良好な結果を示しており、TBS の必要性がまだ確定していない
+- TBS は Depth Guided Augmentation と相性が良い可能性がある
+- したがって、sampling だけは別途切り分けて検証する必要がある
+
+現時点では、sampling に関して以下を保留とする。
+
+- TBS なし
+- TBS あり
+- TBS と Depth Guided Augmentation の組合せ
+
+---
+
+## 5. Bag サイズの考え方
+
+今後の TBS 関連実験では、`patches_per_bag` の固定枚数ではなく、候補 patch 全体に対する割合で Bag サイズを制御する方針を採る。
+
+理由は以下の通りである。
+
+- 画像ごとに解像度が異なるため、固定枚数では比較が不公平になりやすい
+- 候補 patch 数に対する割合の方が、各画像から見る情報量の比率を揃えやすい
+
+ただし、どの割合が最適かは本ファイルでは仮定しない。
+`bag_ratio` と `trunk_bias` の具体値は、既存設定の近傍ではなく、広い範囲を等間隔に探索することで決める。
+
+---
+
+## 6. 今後の分担
+
+本ファイルでは基本方針だけを定める。
+
+- 最適パラメータ探索: [`TBS_paramater.md`](/home/matsumura/vitmil/_detail/TBS_paramater.md)
+- TBS の有無比較: [`TBS_ablation.md`](/home/matsumura/vitmil/_detail/TBS_ablation.md)

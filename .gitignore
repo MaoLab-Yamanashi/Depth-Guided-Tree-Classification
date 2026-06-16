@@ -1,0 +1,24 @@
+# LaTeX build artifacts
+*.aux
+*.fls
+*.fdb_latexmk
+*.log
+*.synctex.gz
+*.out
+*.toc
+*.bbl
+*.blg
+*.nav
+*.snm
+*.vrb
+*.lof
+*.lot
+
+# Generated build directories
+**/latex_out/
+
+# Packaged submission snapshots (regenerate as needed)
+IEEE_ACCESS.zip
+
+# Large raw experiment outputs (not tracked: too large for git)
+new_experiments_result/
