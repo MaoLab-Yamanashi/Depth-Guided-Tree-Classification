@@ -89,8 +89,8 @@ make_depth_delta <- function() {
     DINOv3 = c("DINOv3 MIL", "DINOv3 DepthAug"),
     Swin = c("Swin MIL", "Swin DepthAug")
   )
-  save_png(file.path(fig_dir, "fig16_depth_aug_delta_submission.png"), 2200, 850)
-  par(mfrow = c(1, 2), mar = c(5, 4.5, 3.2, 1), oma = c(0, 0, 2, 0))
+  save_png(file.path(fig_dir, "fig16_depth_aug_delta_submission.png"), 2400, 1000)
+  par(mfrow = c(1, 2), mar = c(6, 4.8, 3.5, 1.5), oma = c(0, 0, 2.5, 0))
   for (dataset in c("FruitsPark", "UrbanStreetTree")) {
     deltas <- sapply(names(labels), function(backbone) {
       pair <- labels[[backbone]]
@@ -100,10 +100,17 @@ make_depth_delta <- function() {
     })
     cols <- ifelse(deltas >= 0, "#0f766e", "#b91c1c")
     title_txt <- ifelse(dataset == "FruitsPark", "FruitsPark (val)", "UrbanStreetTree (test)")
-    bp <- barplot(deltas, ylim = c(min(-4, min(deltas) - 1.2), max(6, max(deltas) + 1)), col = cols, border = "white", main = title_txt, ylab = "DepthAug - MIL Macro-F1 (pp)", las = 2)
+    y_lo <- min(-5, min(deltas, na.rm = TRUE) - 2.5)
+    y_hi <- max(7, max(deltas, na.rm = TRUE) + 2.5)
+    bp <- barplot(deltas, ylim = c(y_lo, y_hi), col = cols, border = "white",
+                  main = title_txt, ylab = "DepthAug − MIL Macro-F1 (pp)", las = 2, cex.names = 0.88)
     abline(h = 0, lwd = 1.2, col = "#111827")
     grid(nx = NA, ny = NULL, col = "#e5e7eb")
-    text(bp, deltas + ifelse(deltas >= 0, 0.35, -0.35), sprintf("%+.1f", deltas), cex = 0.75, pos = ifelse(deltas >= 0, 3, 1))
+    par(xpd = TRUE)
+    lbl_y <- ifelse(deltas >= 0, deltas + 0.4, deltas - 0.4)
+    text(bp, lbl_y, sprintf("%+.1f", deltas), cex = 0.78,
+         pos = ifelse(deltas >= 0, 3, 1))
+    par(xpd = FALSE)
   }
   mtext("Depth-guided augmentation effect by backbone", outer = TRUE, cex = 1.1, font = 2)
   dev.off()
@@ -207,11 +214,97 @@ make_pareto <- function() {
     eff <- rd[rd$choice == "efficient_1pp", ]
     points(best$instances, best$acc_mean, pch = 1, cex = 2.0, lwd = 2.2)
     points(eff$instances, eff$acc_mean, pch = 0, cex = 2.0, lwd = 2.2)
-    text(best$instances, best$acc_mean - 0.9, labels = "best", cex = 0.75)
-    text(eff$instances, eff$acc_mean + 1.0, labels = "efficient", cex = 0.75)
+    text(best$instances, best$acc_mean - 1.8, labels = "best", cex = 0.75)
+    text(eff$instances, eff$acc_mean - 1.8, labels = "efficient", cex = 0.75)
   }
   mtext("Patch-budget Pareto frontier at seed 42", outer = TRUE, cex = 1.1, font = 2)
   legend("bottom", inset = -0.04, xpd = NA, horiz = TRUE, bty = "n", legend = c("Best accuracy", "Efficient <= 1pp"), pch = c(1, 0), pt.cex = 1.4, cex = 0.82)
+  dev.off()
+}
+
+make_learning_efficiency_local <- function() {
+  lc <- read.csv(file.path(data_root, "learning_efficiency", "data", "learning_curve_summary.csv"))
+  lc <- lc[lc$method == "TBS sparse" & lc$bag_ratio %in% c(0.3, 1.0), ]
+  lc$best_pct <- lc$best_val_acc_so_far_mean * 100
+  lc$sd_pct   <- lc$best_val_acc_so_far_std * 100
+
+  cols  <- list("0.3" = "#2563eb", "1.0" = "#374151")
+  ltys  <- list("0.3" = 1,         "1.0" = 2)
+  pchs  <- list("0.3" = 16,        "1.0" = 17)
+  ratios <- c(1.0, 0.3)
+
+  save_png(file.path(fig_dir, "fig21_learning_efficiency_main.png"), 2400, 1000)
+  par(mfrow = c(1, 2), mar = c(5.2, 4.6, 3.5, 1.5), oma = c(0, 0, 2.5, 0))
+
+  for (dataset in c("FruitsPark", "UrbanStreetTree")) {
+    d <- lc[lc$dataset == dataset, ]
+    x_max <- max(d$cumulative_time_min_mean, na.rm = TRUE) * 1.07
+    title_txt <- ifelse(dataset == "FruitsPark", "FruitsPark (val)", "UrbanStreetTree (test)")
+    plot(NA, xlim = c(0, x_max), ylim = c(50, 103), xaxs = "i", yaxs = "i",
+         xlab = "Cumulative training time (min)", ylab = "Best val. accuracy so far (%)",
+         main = title_txt, cex.lab = 1.0)
+    grid(col = "#e5e7eb")
+    abline(h = 95, lty = 3, col = "#9ca3af", lwd = 1.2)
+    text(x_max * 0.02, 96.2, "95%", cex = 0.72, col = "#9ca3af", adj = 0)
+    for (ratio in ratios) {
+      rk  <- sprintf("%.1f", ratio)
+      dr  <- d[d$bag_ratio == ratio, ]
+      dr  <- dr[order(dr$cumulative_time_min_mean), ]
+      col <- cols[[rk]]
+      lty <- ltys[[rk]]
+      pch <- pchs[[rk]]
+      lines(dr$cumulative_time_min_mean, dr$best_pct, col = col, lwd = 2, lty = lty)
+      idx <- seq(1, nrow(dr), by = 5)
+      points(dr$cumulative_time_min_mean[idx], dr$best_pct[idx], pch = pch, cex = 0.7, col = col)
+      last <- dr[nrow(dr), ]
+      end_lbl <- sprintf("ratio=%.1f\n(30 epochs, %.0f min)", ratio, last$cumulative_time_min_mean)
+      text(last$cumulative_time_min_mean, last$best_pct + ifelse(ratio == 0.3, 2.5, -2.5),
+           end_lbl, cex = 0.65, col = col, pos = 2)
+    }
+    legend("bottomright", bty = "n", cex = 0.82,
+           legend = c("ratio = 0.3 (sparse)", "ratio = 1.0 (full)"),
+           col = c(cols[["0.3"]], cols[["1.0"]]),
+           lty = c(ltys[["0.3"]], ltys[["1.0"]]), lwd = 2,
+           pch = c(pchs[["0.3"]], pchs[["1.0"]]))
+  }
+  mtext("Learning efficiency: TBS sparse MIL (4-seed mean, DINOv2 backbone)", outer = TRUE, cex = 1.1, font = 2)
+  dev.off()
+}
+
+make_attention_localization <- function() {
+  al_dir <- file.path(data_root, "AttentionLocalization", "UrbanStreetTree", "sampling_multiseed", "combined")
+  summ <- read.csv(file.path(al_dir, "summary_attention_localization.csv"))
+  per_img <- read.csv(file.path(al_dir, "per_image_attention_localization.csv"))
+  conditions <- c("Random sparse", "TBS sparse", "TBS sparse + DepthAug")
+  labels <- c("Random\nsparse", "TBS\nsparse", "TBS sparse\n+ DepthAug")
+  cols <- c("#6b7280", "#2563eb", "#d97706")
+  summ <- summ[match(conditions, summ$Condition), ]
+
+  save_png(file.path(fig_dir, "fig25_attention_localization_summary.png"), 2400, 1100)
+  par(mfrow = c(1, 4), mar = c(5.5, 4.4, 3.2, 1), oma = c(0, 0, 2, 0))
+
+  bp <- barplot(summ$U_tree_mean, ylim = c(0, 0.22), yaxs = "i", col = cols, border = "white",
+                names.arg = labels, las = 1, cex.names = 0.78, main = "Uniform tree mass", ylab = expression(U[tree]))
+  arrows(bp, summ$U_tree_mean, bp, summ$U_tree_mean + summ$U_tree_std, angle = 90, length = 0.05, lwd = 1.3)
+  grid(nx = NA, ny = NULL, col = "#e5e7eb")
+
+  bp <- barplot(summ$A_tree_mean, ylim = c(0, 0.30), yaxs = "i", col = cols, border = "white",
+                names.arg = labels, las = 1, cex.names = 0.78, main = "Attention tree mass", ylab = expression(A[tree]))
+  arrows(bp, summ$A_tree_mean, bp, summ$A_tree_mean + summ$A_tree_std, angle = 90, length = 0.05, lwd = 1.3)
+  grid(nx = NA, ny = NULL, col = "#e5e7eb")
+
+  bp <- barplot(summ$Delta_tree_mean, ylim = c(0, 0.12), yaxs = "i", col = cols, border = "white",
+                names.arg = labels, las = 1, cex.names = 0.78, main = expression(paste("Attention-uniform gap, ", Delta[tree])), ylab = expression(Delta[tree]))
+  arrows(bp, summ$Delta_tree_mean, bp, summ$Delta_tree_mean + summ$Delta_tree_std, angle = 90, length = 0.05, lwd = 1.3)
+  grid(nx = NA, ny = NULL, col = "#e5e7eb")
+
+  lift_list <- lapply(conditions, function(cnd) per_img$Lift_tree[per_img$condition == cnd & per_img$valid_lift == "True"])
+  names(lift_list) <- labels
+  boxplot(lift_list, col = cols, border = "#374151", las = 1, cex.axis = 0.78, main = "Attention lift", ylab = expression(A[tree] / U[tree]))
+  abline(h = 1, lty = 2, col = "#111827")
+  grid(nx = NA, ny = NULL, col = "#e5e7eb")
+
+  mtext("Attention localization on tree-mask regions (UrbanStreetTree, 4 sampling seeds, n = 572 image-seed pairs)", outer = TRUE, cex = 1.0, font = 2)
   dev.off()
 }
 
@@ -221,3 +314,4 @@ make_depth_delta()
 make_condition_ablation()
 make_foreground_diagnostics()
 make_pareto()
+make_attention_localization()
