@@ -20,6 +20,9 @@
 # Packaged submission snapshots (regenerate as needed)
 IEEE_ACCESS.zip
 
+# Compiled PDFs (large build outputs, regenerate from source)
+IEEE_ACCESS/access.pdf
+
 # Large raw experiment outputs (not tracked: too large for git)
 new_experiments_result/
 IEEE_ACCESS/raw_figures/

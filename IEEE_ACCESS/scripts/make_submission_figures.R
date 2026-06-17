@@ -204,18 +204,15 @@ make_pareto <- function() {
     title_txt <- ifelse(dataset == "FruitsPark", "FruitsPark (val)", "UrbanStreetTree (test)")
     x_max <- max(d$instances, na.rm = TRUE) * 1.08
     plot(d$instances, d$acc_mean, type = "b", pch = 16, col = color, lwd = 2,
-         xlim = c(0, x_max), ylim = c(0, 100), xaxs = "i", yaxs = "i",
+         xlim = c(0, x_max), ylim = c(0, 102), xaxs = "i", yaxs = "i",
          xlab = "Average instances per bag", ylab = "Accuracy (%)", main = title_txt)
     lines(d$instances, d$acc_mean, type = "b", pch = 16, col = color, lwd = 2)
     grid(col = "#e5e7eb")
-    text(d$instances, d$acc_mean + 0.45, labels = sprintf("%.1f", d$bag_ratio), cex = 0.72)
     rd <- rec[rec$dataset == dataset, ]
     best <- rd[rd$choice == "best_acc", ]
     eff <- rd[rd$choice == "efficient_1pp", ]
     points(best$instances, best$acc_mean, pch = 1, cex = 2.0, lwd = 2.2)
     points(eff$instances, eff$acc_mean, pch = 0, cex = 2.0, lwd = 2.2)
-    text(best$instances, best$acc_mean - 1.8, labels = "best", cex = 0.75)
-    text(eff$instances, eff$acc_mean - 1.8, labels = "efficient", cex = 0.75)
   }
   mtext("Patch-budget Pareto frontier at seed 42", outer = TRUE, cex = 1.1, font = 2)
   legend("bottom", inset = -0.04, xpd = NA, horiz = TRUE, bty = "n", legend = c("Best accuracy", "Efficient <= 1pp"), pch = c(1, 0), pt.cex = 1.4, cex = 0.82)

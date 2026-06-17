@@ -394,28 +394,30 @@ Fig.~\ref{fig:filter_response_depthaug} provides a qualitative check for the Sob
 \label{fig:filter_response_depthaug}
 \end{figure*}
 
-We also screened the pseudo-depth source used by DepthAug. Table~\ref{tab:prelim_depth} reports the depth-source diagnostic at $\rho=0.3$ using seed 42. On UrbanStreetTree, MiDaS Hybrid achieves the strongest test performance among the evaluated depth-inferred augmentations, with 96.50\% accuracy and 95.44\% macro-$F_1$. It also exceeds the oracle-mask augmentation runs in this diagnostic: the oracle-mask mean over seeds 42--45 is 87.24\% accuracy and 84.92\% macro-$F_1$, and the best oracle-mask seed reaches 93.71\% and 92.70\%. On FruitsPark, Marigold is slightly higher on validation, but MiDaS Hybrid remains within 0.48 percentage points in accuracy. Because UrbanStreetTree has an independent test split and is the more direct street-scene benchmark, we use MiDaS Hybrid as the standard pseudo-depth source in the final experiments. The depth model is not used at inference; it only constructs training-time background perturbations.
+We also screened the pseudo-depth source used by DepthAug, evaluating ten off-the-shelf depth estimators on both datasets. Table~\ref{tab:prelim_depth} reports the results at $\rho=0.3$ using seed 42. On UrbanStreetTree, MiDaS Hybrid achieves the strongest test performance among all ten depth-inferred sources, with 96.50\% accuracy and 95.44\% macro-$F_1$, and it also exceeds the oracle-mask augmentation at seed 42, which reaches only 81.12\% accuracy and 77.63\% macro-$F_1$. On FruitsPark, Marigold ranks first on validation, but MiDaS Hybrid remains within 0.48 percentage points in accuracy. Because UrbanStreetTree has an independent test split and is the more direct street-scene benchmark, we use MiDaS Hybrid as the standard pseudo-depth source in the final experiments. The depth model is not used at inference; it only constructs training-time background perturbations.
 
 \begin{table*}[t]
 \centering
-\caption{Depth-source screening for DepthAug at $\rho=0.3$. Accuracy and macro-$F_1$ are percentages. FruitsPark is validation-only; UrbanStreetTree is evaluated on test.}
+\caption{Depth-source screening for DepthAug at $\rho=0.3$, seed 42. Ten off-the-shelf depth estimators were evaluated on both datasets. Accuracy and macro-$F_1$ are percentages. FruitsPark uses validation; UrbanStreetTree uses test. Bold indicates the best depth-inferred source for each dataset.}
 \label{tab:prelim_depth}
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{llccc}
+\begin{tabular}{lcc@{\hspace{1.5em}}llcc}
 \toprule
-Dataset & Depth/Mask source & Split & Accuracy & Macro-$F_1$ \\
+\multicolumn{3}{c}{FruitsPark (Val)} & & \multicolumn{3}{c}{UrbanStreetTree (Test)} \\
+\cmidrule(r){1-3}\cmidrule(l){5-7}
+Depth/Mask source & Accuracy & Macro-$F_1$ & & Depth/Mask source & Accuracy & Macro-$F_1$ \\
 \midrule
-FruitsPark & Marigold & Val & 90.00 & 89.97 \\
-FruitsPark & Depth Anything V2 & Val & 89.52 & 89.45 \\
-FruitsPark & MiDaS Hybrid & Val & 89.52 & 89.33 \\
-\midrule
-UrbanStreetTree & MiDaS Hybrid & Test & \textbf{96.50} & \textbf{95.44} \\
-UrbanStreetTree & DPT Large Original & Test & 94.41 & 93.83 \\
-UrbanStreetTree & Marigold & Test & 94.41 & 93.75 \\
-UrbanStreetTree & MiDaS Large & Test & 93.01 & 91.62 \\
-UrbanStreetTree & Depth Anything V2 & Test & 86.01 & 83.89 \\
-UrbanStreetTree & Oracle mask, seed 42 & Test & 81.12 & 77.63 \\
-UrbanStreetTree & Oracle mask, seeds 42--45 mean & Test & $87.24\pm5.34$ & $84.92\pm6.28$ \\
+Marigold                & \textbf{90.00} & \textbf{89.97} & & MiDaS Hybrid           & \textbf{96.50} & \textbf{95.44} \\
+Depth Anything V2       & 89.52 & 89.45 & & DPT Large Original     & 94.41 & 93.83 \\
+MiDaS Hybrid            & 89.52 & 89.33 & & Marigold               & 94.41 & 93.75 \\
+AdaBins                 & 89.05 & 89.12 & & MiDaS Large            & 93.01 & 91.62 \\
+Depth Anything V1       & 84.76 & 84.75 & & ZoeDepth               & 90.91 & 89.56 \\
+Depth Anything V3       & 83.81 & 83.73 & & Depth Anything V1      & 90.91 & 88.95 \\
+ZoeDepth                & 80.95 & 80.84 & & Depth Anything V3      & 88.81 & 86.74 \\
+DPT Large Original      & 80.48 & 81.00 & & LeReS                  & 88.81 & 86.38 \\
+LeReS                   & 80.00 & 80.53 & & AdaBins                & 86.71 & 85.04 \\
+MiDaS Large             & 79.05 & 78.68 & & Depth Anything V2      & 86.01 & 83.89 \\
+                        &       &       & & Oracle mask            & 81.12 & 77.63 \\
 \bottomrule
 \end{tabular}}
 \end{table*}
@@ -665,14 +667,14 @@ TBS sparse + DepthAug & $0.098\pm0.090$ & $0.138\pm0.102$ & $0.041\pm0.049$ & 1.
 
 \begin{figure*}[p]
 \centering
-\includegraphics[width=\textwidth]{figures/fig26a_attention_top.png}
+\includegraphics[width=\textwidth,height=0.92\textheight,keepaspectratio]{figures/fig26_attention_localization_qualitative.png}
 \caption{Representative ABMIL attention heatmaps per UrbanStreetTree class, Part~1 of~2 (species 1--7), from the sampling-seed-42 checkpoints. Each row shows one correctly classified test image selected closest to the class median foreground ratio. Columns: input image with tree mask, attention heatmap under random sparse, TBS sparse, and TBS sparse with DepthAug selection.}
 \label{fig:attention_localization_qualitative}
 \end{figure*}
 
 \begin{figure*}[p]
 \centering
-\includegraphics[width=\textwidth]{figures/fig26b_attention_bottom.png}
+\includegraphics[width=\textwidth,height=0.92\textheight,keepaspectratio]{figures/fig26b_attention_localization_qualitative.png}
 \caption{Representative ABMIL attention heatmaps per UrbanStreetTree class, Part~2 of~2 (species 8--13), continued from Fig.~\ref{fig:attention_localization_qualitative}. Layout and selection criteria are identical to Part~1.}
 \label{fig:attention_localization_qualitative_b}
 \end{figure*}
