@@ -270,12 +270,24 @@ make_learning_efficiency_local <- function() {
 
 make_attention_localization <- function() {
   al_dir <- file.path(data_root, "AttentionLocalization", "UrbanStreetTree", "sampling_multiseed", "combined")
-  summ <- read.csv(file.path(al_dir, "summary_attention_localization.csv"))
-  per_img <- read.csv(file.path(al_dir, "per_image_attention_localization.csv"))
+  per_seed <- read.csv(file.path(al_dir, "per_image_attention_localization.csv"))
   conditions <- c("Random sparse", "TBS sparse", "TBS sparse + DepthAug")
   labels <- c("Random\nsparse", "TBS\nsparse", "TBS sparse\n+ DepthAug")
   cols <- c("#6b7280", "#2563eb", "#d97706")
-  summ <- summ[match(conditions, summ$Condition), ]
+  metrics <- c("U_tree", "A_tree", "Delta_tree", "Lift_tree")
+  per_img <- aggregate(per_seed[metrics], per_seed[c("condition", "image_id")], mean)
+  summ <- do.call(rbind, lapply(conditions, function(cnd) {
+    x <- per_img[per_img$condition == cnd, ]
+    data.frame(
+      Condition = cnd,
+      U_tree_mean = mean(x$U_tree),
+      U_tree_std = sd(x$U_tree),
+      A_tree_mean = mean(x$A_tree),
+      A_tree_std = sd(x$A_tree),
+      Delta_tree_mean = mean(x$Delta_tree),
+      Delta_tree_std = sd(x$Delta_tree)
+    )
+  }))
 
   save_png(file.path(fig_dir, "fig25_attention_localization_summary.png"), 2400, 1100)
   par(mfrow = c(1, 4), mar = c(5.5, 4.4, 3.2, 1), oma = c(0, 0, 2, 0))
@@ -295,13 +307,13 @@ make_attention_localization <- function() {
   arrows(bp, summ$Delta_tree_mean, bp, summ$Delta_tree_mean + summ$Delta_tree_std, angle = 90, length = 0.05, lwd = 1.3)
   grid(nx = NA, ny = NULL, col = "#e5e7eb")
 
-  lift_list <- lapply(conditions, function(cnd) per_img$Lift_tree[per_img$condition == cnd & per_img$valid_lift == "True"])
+  lift_list <- lapply(conditions, function(cnd) per_img$Lift_tree[per_img$condition == cnd])
   names(lift_list) <- labels
-  boxplot(lift_list, col = cols, border = "#374151", las = 1, cex.axis = 0.78, main = "Attention lift", ylab = expression(A[tree] / U[tree]))
+  boxplot(lift_list, col = cols, border = "#374151", las = 1, cex.axis = 0.78, main = expression(paste("Relative attention lift, ", L[tree])), ylab = expression(L[tree]))
   abline(h = 1, lty = 2, col = "#111827")
   grid(nx = NA, ny = NULL, col = "#e5e7eb")
 
-  mtext("Attention localization on tree-mask regions (UrbanStreetTree, 4 sampling seeds, n = 572 image-seed pairs)", outer = TRUE, cex = 1.0, font = 2)
+  mtext("Attention localization on tree-mask regions (UrbanStreetTree, four-seed average, n = 143 images)", outer = TRUE, cex = 1.0, font = 2)
   dev.off()
 }
 
