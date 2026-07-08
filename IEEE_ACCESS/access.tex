@@ -27,7 +27,7 @@
 \history{Date of publication xxxx 00, 0000, date of current version xxxx 00, 0000.}
 \doi{10.1109/ACCESS.2026.DOI}
 
-\title{Depth-Regularized Sparse Multiple Instance Learning for Mid-Range Tree Species Classification under Background-Dominant Conditions}
+\title{Tree Species Classification from Mid-Range Images Using Sparse Patches and Depth During Training}
 
 \author{\uppercase{Takahiro Matsumura}\authorrefmark{1}}
 
@@ -42,7 +42,24 @@
 \corresp{Corresponding author: Takahiro Matsumura (contact details to be confirmed).}
 
 \begin{abstract}
-Tree species classification from ground-level images is important for urban forestry, orchard management, and ecological monitoring. Existing recognition systems often assume close-up views of leaves, flowers, fruits, or bark, whereas practical field images are frequently captured from mid-range distances. In this setting, discriminative evidence from trunks, branches, and bark occupies only a small part of the image, while buildings, roads, sky, signs, vehicles, and neighboring trees dominate the background. This creates a background-dominant weakly supervised recognition problem: image-level labels are available, but the informative regions are sparse and not manually annotated. This paper proposes a depth-regularized sparse multiple instance learning framework for mid-range tree species classification. Images are converted into bags of local patches, trunk-biased sampling selects structurally informative patches using gradient-based scores, and attention-based multiple instance learning aggregates the selected instances. Depth-guided augmentation is used only during training to preserve foreground tree structures while perturbing background regions, so inference requires RGB images only. Dataset diagnostics show that background and acquisition-context probes can perform far above chance, supporting the need for background-regularized aggregation. Experiments on FruitsPark and UrbanStreetTree compare image-level baselines, sparse MIL, and sparse depth-augmented MIL under a unified protocol. In the single-seed (seed 42) fixed-budget backbone comparison on UrbanStreetTree, ViT DepthAug achieves 95.80\% accuracy and 95.00\% macro-$F_1$, outperforming the corresponding ViT GAP protocol by 36.36 and 36.66 percentage points, respectively. A separate ViT ratio sweep further shows that reducing the patch budget need not reduce accuracy: on UrbanStreetTree, a 0.6 bag ratio achieves 97.90\% accuracy, the best observed result, while using only 244.5 rather than 407.8 instances on average. An efficiency analysis further shows that sparse training reduces training time and processed patches, and end-to-end inference benchmarks show lower latency and GPU memory than full-patch inference. These results suggest that depth-regularized sparse MIL is an effective and computationally efficient strategy for tree classification under background-dominant mid-range imaging conditions.
+Tree species classification from images taken from the ground is useful for urban forestry, orchard management,
+and ecological monitoring, but practical images are often captured from several meters away.
+In such images, trunks, branches, and bark occupy small regions, while buildings, roads, sky,
+vehicles, and neighboring vegetation dominate the background.
+This paper studies tree species classification when only image-level species labels are available,
+without manual annotations of the informative tree regions.
+We propose a sparse patch MIL framework for mid-range tree images.
+The method selects candidate patches likely to contain tree structure and aggregates them with attention-based MIL.
+Depth is used only during training to reduce reliance on background cues, while inference remains RGB-only.
+On UrbanStreetTree dataset, ViT DepthAug achieves 95.80\% accuracy and 95.00\% macro-$F_1$,
+improving over the same-backbone image-level GAP baseline by 36.36 and 36.66 percentage points, respectively.
+On FruitsPark dataset, DINOv2 DepthAug achieves 96.19\% accuracy and 96.21\% macro-$F_1$,
+improving over the corresponding DINOv2 GAP baseline by 3.81 and 3.87 points.
+For UrbanStreetTree, an aggressive 0.3 patch ratio still improves accuracy over full selection
+by 2.79 percentage points while reducing processed instances by 69.9\%, end-to-end latency by 37.1\%,
+and GPU memory by 48.4\%.
+For FruitsPark, a 0.6 patch ratio stays within 0.48 points of full selection while reducing
+processed instances by 39.4\% and latency by 28.9\%.
 \end{abstract}
 
 \begin{keywords}
