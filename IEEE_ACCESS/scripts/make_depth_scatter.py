@@ -21,10 +21,12 @@ colors  = {"selected": "#d62728", "other": "#aaaaaa"}
 markers = {"selected": "*",       "other": "x"}
 sizes   = {"selected": 220,       "other": 60}
 
-fig, ax = plt.subplots(figsize=(6.5, 5.2))
+fig, ax = plt.subplots(figsize=(6.5, 6.0))
 
-xlim = (77, 93.0)
-ylim = (92, 100.2)
+# Use the same range and tick spacing on both axes so that horizontal and
+# vertical differences have the same visual magnitude.
+xlim = (78, 101)
+ylim = (78, 101)
 
 for name, fp, ust, status in data:
     ax.scatter(fp, ust,
@@ -33,21 +35,22 @@ for name, fp, ust, status in data:
                edgecolors="white" if status == "selected" else "none",
                linewidths=0.8)
 
-nudges = {
-    "MiDaS Hybrid":        (+0.12, +0.15),
-    "Marigold":            (+0.12, +0.15),
-    "Depth Anything V2":   (+0.12, +0.35),
-    "AdaBins":             (+0.12, +0.15),
-    "Depth Anything V1":   (+0.12, +0.25),
-    "Depth Anything V3":   (+0.12, +0.25),
-    "ZoeDepth":            (+0.12, +0.25),
-    "DPT Large Original":  (+0.12, -0.70),
-    "LeReS":               (+0.12, +0.25),
-    "MiDaS Large":         (-1.80, +0.25),
+label_offsets = {
+    "MiDaS Hybrid":        (5, 5),
+    "Marigold":            (5, 5),
+    "Depth Anything V2":   (5, 5),
+    "AdaBins":             (5, -14),
+    "Depth Anything V1":   (5, 5),
+    "Depth Anything V3":   (5, 5),
+    "ZoeDepth":            (5, 5),
+    "DPT Large Original":  (5, -14),
+    "LeReS":               (5, 5),
+    "MiDaS Large":         (5, -14),
 }
 for name, fp, ust, status in data:
-    dx, dy = nudges.get(name, (0.1, 0.3))
-    ax.annotate(name, (fp, ust), xytext=(fp + dx, ust + dy),
+    dx, dy = label_offsets.get(name, (5, 5))
+    ax.annotate(name, (fp, ust), xytext=(dx, dy),
+                textcoords="offset points",
                 fontsize=7.5, color="#333333",
                 arrowprops=None)
 
@@ -56,11 +59,19 @@ ax.set_ylabel("UrbanStreetTree validation accuracy (%)", fontsize=10)
 ax.set_title("Cross-dataset depth-source stability", fontsize=11)
 ax.set_xlim(*xlim)
 ax.set_ylim(*ylim)
+ticks = np.arange(78, 101, 2)
+ax.set_xticks(ticks)
+ax.set_yticks(ticks)
+ax.set_aspect("equal", adjustable="box")
+ax.plot(xlim, ylim, linestyle="--", linewidth=0.8, color="#777777",
+        alpha=0.7, zorder=1, label="Equal accuracy")
 ax.grid(True, linewidth=0.4, alpha=0.5)
 
 legend_handles = [
     mpatches.Patch(color=colors["selected"], label="Selected (MiDaS Hybrid)"),
     mpatches.Patch(color=colors["other"],    label="Other depth sources"),
+    plt.Line2D([0], [0], color="#777777", linestyle="--",
+               linewidth=0.8, label="Equal accuracy"),
 ]
 ax.legend(handles=legend_handles, fontsize=8, loc="lower right")
 
