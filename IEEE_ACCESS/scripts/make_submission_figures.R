@@ -151,20 +151,23 @@ make_sampling_seed_comparison <- function() {
 
   save_png(file.path(fig_dir, "fig24_sampling_seed_comparison.png"), 3200, 1800)
   par(mfrow = c(2, 2), mar = c(4.4, 4.7, 2.6, 0.9), oma = c(0.1, 0, 1.7, 0),
-      cex.axis = 1.10, cex.lab = 1.12, cex.main = 1.16)
+      cex.axis = 1.47, cex.lab = 1.49, cex.main = 1.55)
   for (panel in panels) {
     d <- summ[summ$dataset == panel$dataset, ]
     d <- d[match(method_order, d$method), ]
     vals <- d[[panel$metric]] * 100
     errs <- d[[panel$sd]] * 100
     bp <- barplot(vals, ylim = c(0, 100), yaxs = "i", col = cols, border = "white",
-                  names.arg = label_map[method_order], las = 1, cex.names = 1.08,
+                  names.arg = rep("", length(vals)), las = 1,
                   main = panel$title, ylab = panel$ylab)
+    text(bp, -3.0, label_map[method_order], cex = 1.44,
+         adj = c(0.5, 1), xpd = NA)
     arrows(bp, pmax(vals - errs, 0), bp, pmin(vals + errs, 100), angle = 90,
            code = 3, length = 0.05, lwd = 1.35, col = "#111827")
-    text(bp, pmin(vals + errs + 2.0, 98.5), sprintf("%.1f", vals), cex = 1.00)
+    text(bp, pmin(vals + errs + 3.8, 98.5), sprintf("%.1f", vals), cex = 1.33)
   }
-  mtext("Multiseed comparison by dataset", outer = TRUE, cex = 1.28, font = 2)
+  mtext("Multiseed comparison by dataset", outer = TRUE, line = 0.4,
+        cex = 1.71, font = 2)
   dev.off()
 }
 
