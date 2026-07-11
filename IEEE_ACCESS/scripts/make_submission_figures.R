@@ -274,7 +274,7 @@ make_pareto <- function() {
     y_pad <- max(1.5, diff(y_lim) * 0.18)
     plot(NA, xlim = c(0.08, 1.02), ylim = c(y_lim[1] - y_pad, y_lim[2] + y_pad),
          xaxs = "i", yaxs = "i", xaxt = "n",
-         xlab = "Rate",
+         xlab = "Bag ratio",
          ylab = "Accuracy relative to full patch (%)", main = title_txt)
     shown_rates <- seq(0.1, 1.0, by = 0.1)
     axis(1, at = shown_rates, labels = sprintf("%.1f", shown_rates), cex.axis = 0.92)
@@ -288,7 +288,7 @@ make_pareto <- function() {
     eff <- rd[rd$choice == "efficient_1pp", ]
     points(eff$ratio, eff$rel_acc, pch = 21, cex = 2.1, lwd = 2.2, bg = "white")
     text(eff$ratio, eff$rel_acc, labels = sprintf("%.1f%%", eff$rel_acc),
-         cex = 0.82, pos = ifelse(eff$rel_acc > 100, 3, 1), offset = 0.8)
+         cex = 0.82, pos = 3, offset = 0.8)
     legend("bottomright", bty = "n", cex = 0.92,
            legend = c("Proposed (TBS)", "Random", "Efficient point"),
            col = c(cols[["Proposed (TBS)"]], cols[["Random"]], "#111827"),
