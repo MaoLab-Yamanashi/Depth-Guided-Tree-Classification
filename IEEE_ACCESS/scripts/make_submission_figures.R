@@ -370,26 +370,31 @@ make_attention_localization <- function() {
   }))
 
   save_png(file.path(fig_dir, "fig25_attention_localization_summary.png"), 2400, 1100)
-  par(mfrow = c(1, 4), mar = c(5.5, 4.4, 3.2, 1), oma = c(0, 0, 2, 0))
+  par(mfrow = c(1, 4), mar = c(5.5, 4.8, 3.2, 1), oma = c(0, 0, 2, 0),
+      cex.axis = 1.20, cex.lab = 1.25, cex.main = 1.35)
 
   bp <- barplot(summ$U_tree_mean, ylim = c(0, 0.22), yaxs = "i", col = cols, border = "white",
-                names.arg = labels, las = 1, cex.names = 0.78, main = "Uniform tree mass", ylab = expression(U[tree]))
+                names.arg = labels, las = 1, cex.names = 1.05, main = "Uniform tree mass", ylab = expression(U[tree]))
   arrows(bp, summ$U_tree_mean, bp, summ$U_tree_mean + summ$U_tree_std, angle = 90, length = 0.05, lwd = 1.3)
 
   bp <- barplot(summ$A_tree_mean, ylim = c(0, 0.30), yaxs = "i", col = cols, border = "white",
-                names.arg = labels, las = 1, cex.names = 0.78, main = "Attention tree mass", ylab = expression(A[tree]))
+                names.arg = labels, las = 1, cex.names = 1.05, main = "Attention tree mass", ylab = expression(A[tree]))
   arrows(bp, summ$A_tree_mean, bp, summ$A_tree_mean + summ$A_tree_std, angle = 90, length = 0.05, lwd = 1.3)
 
   bp <- barplot(summ$Delta_tree_mean, ylim = c(0, 0.12), yaxs = "i", col = cols, border = "white",
-                names.arg = labels, las = 1, cex.names = 0.78, main = expression(paste("Attention-uniform gap, ", Delta[tree])), ylab = expression(Delta[tree]))
+                names.arg = labels, las = 1, cex.names = 1.05, main = expression(paste("Attention-uniform gap, ", Delta[tree])), ylab = expression(Delta[tree]))
   arrows(bp, summ$Delta_tree_mean, bp, summ$Delta_tree_mean + summ$Delta_tree_std, angle = 90, length = 0.05, lwd = 1.3)
 
   lift_list <- lapply(conditions, function(cnd) per_img$Lift_tree[per_img$condition == cnd])
   names(lift_list) <- labels
-  boxplot(lift_list, col = cols, border = "#374151", las = 1, cex.axis = 0.78, main = expression(paste("Relative attention lift, ", L[tree])), ylab = expression(L[tree]))
+  boxplot(lift_list, col = cols, border = "#374151", las = 1, cex.axis = 1.05,
+          xaxt = "n", main = expression(paste("Relative attention lift, ", L[tree])),
+          ylab = expression(L[tree]))
+  axis(1, at = seq_along(labels), labels = labels, tick = FALSE,
+       line = 0.7, cex.axis = 1.05)
   abline(h = 1, lty = 2, col = "#111827")
 
-  mtext("Attention localization on tree-mask regions (UrbanStreetTree, four-seed average, n = 143 images)", outer = TRUE, cex = 1.0, font = 2)
+  mtext("Attention localization on tree-mask regions (UrbanStreetTree, four-seed average, n = 143 images)", outer = TRUE, cex = 1.30, font = 2)
   dev.off()
 }
 
