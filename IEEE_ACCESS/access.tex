@@ -858,8 +858,8 @@ Sparse DepthAug & Swin DepthAug & $84.29$ \gain{3.81} & $84.15$ \gain{4.65} & $9
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig15_overall_comparison_selected.png}
-\caption{Representative macro-$F_1$ comparison. Gray bars indicate image-level GAP baselines, blue
-         bars indicate sparse MIL, and orange bars indicate sparse MIL with DepthAug.}
+\caption{Representative macro-$F_1$ comparison. Model labels identify image-level GAP baselines,
+         sparse MIL models, and sparse MIL models trained with DepthAug; DA denotes DepthAug.}
 \label{fig:overall_rank}
 \end{figure*}
 
@@ -880,8 +880,9 @@ superiority claim.
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig16_depth_aug_delta_submission.png}
-\caption{DepthAug delta relative to corresponding sparse MIL models. The effect is generally
-         positive on UrbanStreetTree and dataset-dependent on FruitsPark.}
+\caption{DepthAug delta relative to corresponding sparse MIL models. Values are macro-$F_1$
+         percentage-point differences; positive values indicate gains and negative values indicate
+         losses.}
 \label{fig:depth_delta}
 \end{figure*}
 
@@ -930,9 +931,11 @@ regularizer rather than as a uniformly beneficial component.
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig24_sampling_seed_comparison.png}
-\caption{Fixed-budget sparse-selection diagnostic under four seed-controlled sampling settings. TBS
-         improves over random sparse sampling on average, while the contribution of DepthAug differs
-         between FruitsPark and UrbanStreetTree.}
+\caption{Fixed-budget sparse-selection diagnostic under four seed-controlled sampling settings.
+         X-axis abbreviations denote full training/full evaluation (Full/full), full training with
+         sparse evaluation (Full/sparse), random sparse training/evaluation (Random), trunk-biased
+         sparse training/evaluation (TBS), and TBS sparse training with DepthAug followed by sparse
+         RGB evaluation (TBS+DepthAug).}
 \label{fig:sampling_seed_comparison}
 \end{figure*}
 
@@ -978,10 +981,12 @@ UrbanStreetTree & Proposed, full & 1.0 & 93.71 & 92.53 & 407.8 & 7.07 \\
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig17_pareto_frontier_submission.png}
-\caption{Patch-budget Pareto frontier for ViT TBS sparse MIL with DepthAug (sampling seed 42), plotting
-         accuracy against average instances per bag. Trunk-biased selection (Proposed) is compared
-         with random selection at each budget. On UrbanStreetTree the proposed method peaks at an
-         intermediate budget and exceeds both random selection and the full-patch setting.}
+\caption{Patch-budget Pareto frontier for ViT TBS sparse MIL with DepthAug (sampling seed 42),
+         plotting accuracy normalized by the corresponding full-patch setting at $\rho=1.0$
+         (full patch = 100\%). The horizontal 100\% line indicates no change from full-patch
+         accuracy; values above 100\% indicate gains and values below 100\% indicate losses.
+         Trunk-biased selection (Proposed) is compared with random selection at each sampling rate
+         using distinct markers and line styles.}
 \label{fig:pareto_overview}
 \end{figure*}
 

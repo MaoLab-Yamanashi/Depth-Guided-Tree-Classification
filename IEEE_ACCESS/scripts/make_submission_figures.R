@@ -60,23 +60,27 @@ make_overall <- function() {
     "Swin GAP" = "Swin\nGAP",
     "ViT MIL" = "ViT\nMIL",
     "DINOv2 MIL" = "DINOv2\nMIL",
-    "ViT DepthAug" = "ViT\nDepthAug",
-    "DINOv2 DepthAug" = "DINOv2\nDepthAug"
+    "ViT DepthAug" = "ViT\nDA",
+    "DINOv2 DepthAug" = "DINOv2\nDA"
   )
   group_cols <- c("baseline" = "#6b7280", "mil" = "#2563eb", "depth_aug" = "#d97706")
   save_png(file.path(fig_dir, "fig15_overall_comparison_selected.png"), 2400, 1050)
-  par(mfrow = c(1, 2), mar = c(5.5, 4.2, 3.2, 1), oma = c(0.5, 0, 2, 0))
+  par(mfrow = c(1, 2), mar = c(5.6, 4.8, 3.2, 1), oma = c(0.5, 0, 2, 0),
+      cex.axis = 0.98, cex.lab = 1.08, cex.main = 1.18)
   for (dataset in c("FruitsPark", "UrbanStreetTree")) {
     sub <- df[df$dataset == dataset & df$label %in% selected, ]
     sub <- sub[match(selected, sub$label), ]
     vals <- sub$macro_f1 * 100
     cols <- group_cols[sub$method]
     title_txt <- ifelse(dataset == "FruitsPark", "FruitsPark (val)", "UrbanStreetTree (test)")
-    bp <- barplot(vals, ylim = c(0, 100), yaxs = "i", col = cols, border = "white", names.arg = label_map[sub$label], las = 1, cex.names = 0.72, main = title_txt, ylab = "Macro-F1 (%)")
-    grid(nx = NA, ny = NULL, col = "#e5e7eb")
-    text(bp, pmin(vals + 1.0, 99.4), sprintf("%.1f", vals), cex = 0.65)
+    bp <- barplot(vals, ylim = c(0, 105), yaxs = "i", col = cols, border = "white",
+                  names.arg = rep("", length(vals)), las = 1,
+                  main = title_txt, ylab = "Macro-F1 (%)")
+    text(bp, -2.5, label_map[sub$label], cex = c(0.78, rep(0.95, length(vals) - 1)),
+         adj = c(0.5, 1), xpd = NA)
+    text(bp, vals + 2.5, sprintf("%.1f", vals), cex = 0.92)
   }
-  mtext("Representative model comparison at seed 42", outer = TRUE, cex = 1.1, font = 2)
+  mtext("Representative model comparison", outer = TRUE, cex = 1.22, font = 2)
   dev.off()
 }
 
@@ -90,7 +94,8 @@ make_depth_delta <- function() {
     Swin = c("Swin MIL", "Swin DepthAug")
   )
   save_png(file.path(fig_dir, "fig16_depth_aug_delta_submission.png"), 2400, 1000)
-  par(mfrow = c(1, 2), mar = c(6, 4.8, 3.5, 1.5), oma = c(0, 0, 2.5, 0))
+  par(mfrow = c(1, 2), mar = c(5.0, 5.0, 3.5, 1.4), oma = c(0, 0, 2.5, 0),
+      cex.axis = 1.02, cex.lab = 1.08, cex.main = 1.18)
   for (dataset in c("FruitsPark", "UrbanStreetTree")) {
     deltas <- sapply(names(labels), function(backbone) {
       pair <- labels[[backbone]]
@@ -103,16 +108,63 @@ make_depth_delta <- function() {
     y_lo <- min(-5, min(deltas, na.rm = TRUE) - 2.5)
     y_hi <- max(7, max(deltas, na.rm = TRUE) + 2.5)
     bp <- barplot(deltas, ylim = c(y_lo, y_hi), col = cols, border = "white",
-                  main = title_txt, ylab = "DepthAug − MIL Macro-F1 (pp)", las = 2, cex.names = 0.88)
-    abline(h = 0, lwd = 1.2, col = "#111827")
-    grid(nx = NA, ny = NULL, col = "#e5e7eb")
+                  main = title_txt, ylab = "DepthAug - MIL Macro-F1 (pp)",
+                  las = 1, cex.names = 1.02)
+    abline(h = 0, lwd = 2.4, col = "#111827")
     par(xpd = TRUE)
     lbl_y <- ifelse(deltas >= 0, deltas + 0.4, deltas - 0.4)
-    text(bp, lbl_y, sprintf("%+.1f", deltas), cex = 0.78,
+    text(bp, lbl_y, sprintf("%+.1f", deltas), cex = 1.00,
          pos = ifelse(deltas >= 0, 3, 1))
     par(xpd = FALSE)
   }
-  mtext("Depth-guided augmentation effect by backbone", outer = TRUE, cex = 1.1, font = 2)
+  mtext("Depth-guided augmentation effect by backbone", outer = TRUE, cex = 1.22, font = 2)
+  dev.off()
+}
+
+make_sampling_seed_comparison <- function() {
+  summ <- read.csv(file.path(data_root, "TBSStory4KindSamplingSeed", "summary_by_method.csv"))
+  method_order <- c(
+    "full_train_full_eval",
+    "full_train_sparse_eval",
+    "random_sparse_sparse_eval",
+    "tbs_sparse_sparse_eval",
+    "tbs_sparse_depth_aug_sparse_eval"
+  )
+  label_map <- c(
+    "full_train_full_eval" = "Full/\nfull",
+    "full_train_sparse_eval" = "Full/\nsparse",
+    "random_sparse_sparse_eval" = "Random",
+    "tbs_sparse_sparse_eval" = "TBS",
+    "tbs_sparse_depth_aug_sparse_eval" = "TBS+\nDepthAug"
+  )
+  cols <- c("#5b7fa8", "#7dbdb6", "#f28e2b", "#62a65b", "#e15f62")
+  panels <- list(
+    list(dataset = "FruitsPark", metric = "final_acc_mean", sd = "final_acc_std",
+         title = "FruitsPark: Accuracy (val)", ylab = "Accuracy (%)"),
+    list(dataset = "FruitsPark", metric = "final_macro_f1_mean", sd = "final_macro_f1_std",
+         title = "FruitsPark: Macro-F1 (val)", ylab = "Macro-F1 (%)"),
+    list(dataset = "UrbanStreetTree", metric = "final_acc_mean", sd = "final_acc_std",
+         title = "UrbanStreetTree: Accuracy (test)", ylab = "Accuracy (%)"),
+    list(dataset = "UrbanStreetTree", metric = "final_macro_f1_mean", sd = "final_macro_f1_std",
+         title = "UrbanStreetTree: Macro-F1 (test)", ylab = "Macro-F1 (%)")
+  )
+
+  save_png(file.path(fig_dir, "fig24_sampling_seed_comparison.png"), 3200, 1800)
+  par(mfrow = c(2, 2), mar = c(4.4, 4.7, 2.6, 0.9), oma = c(0.1, 0, 1.7, 0),
+      cex.axis = 1.10, cex.lab = 1.12, cex.main = 1.16)
+  for (panel in panels) {
+    d <- summ[summ$dataset == panel$dataset, ]
+    d <- d[match(method_order, d$method), ]
+    vals <- d[[panel$metric]] * 100
+    errs <- d[[panel$sd]] * 100
+    bp <- barplot(vals, ylim = c(0, 100), yaxs = "i", col = cols, border = "white",
+                  names.arg = label_map[method_order], las = 1, cex.names = 1.08,
+                  main = panel$title, ylab = panel$ylab)
+    arrows(bp, pmax(vals - errs, 0), bp, pmin(vals + errs, 100), angle = 90,
+           code = 3, length = 0.05, lwd = 1.35, col = "#111827")
+    text(bp, pmin(vals + errs + 2.0, 98.5), sprintf("%.1f", vals), cex = 1.00)
+  }
+  mtext("Multiseed comparison by dataset", outer = TRUE, cex = 1.28, font = 2)
   dev.off()
 }
 
@@ -149,7 +201,6 @@ make_condition_ablation <- function() {
     bp <- barplot(vals, ylim = c(0, 1), yaxs = "i", col = cols, border = "white",
                   names.arg = label_map[d$condition], las = 2, cex.names = 0.68,
                   main = title_txt, ylab = "Accuracy")
-    grid(nx = NA, ny = NULL, col = "#e5e7eb")
     arrows(bp, pmax(vals - errs, 0), bp, pmin(vals + errs, 1), angle = 90, code = 3, length = 0.05, lwd = 1.2, col = "#111827")
     text(bp, pmin(vals + errs + 0.035, 0.98), sprintf("%.3f", vals), cex = 0.72)
   }
@@ -158,7 +209,11 @@ make_condition_ablation <- function() {
 }
 
 make_foreground_diagnostics <- function() {
-  fg <- read.csv(file.path(data_root, "Sparse_experiments", "mil_diagnostics", "foreground_diagnostics", "foreground_diagnostics_by_ratio.csv"))
+  fg_path <- file.path(data_root, "Sparse_experiments", "mil_diagnostics", "foreground_diagnostics", "foreground_diagnostics_by_ratio.csv")
+  if (!file.exists(fg_path)) {
+    return(invisible(NULL))
+  }
+  fg <- read.csv(fg_path)
   fg <- fg[fg$dataset == "UrbanStreetTree", ]
   fg <- fg[order(fg$bag_ratio), ]
   metrics <- list(
@@ -180,42 +235,64 @@ make_foreground_diagnostics <- function() {
 }
 
 make_pareto <- function() {
-  ratio <- read.csv(file.path(data_root, "Sparse_experiments", "mil_diagnostics", "mil_diagnostics_summary.csv"))
+  ratio <- read.csv(file.path(data_root, "Pareto_analysis", "Pareto_curve", "data", "run_level_metrics.csv"))
   ratio <- ratio[ratio$seed == 42, ]
-  ratio$instances <- ratio$avg_bag_size
   ratio$acc_mean <- ratio$final_eval_acc * 100
   ratio$f1_mean <- ratio$final_eval_macro_f1 * 100
-  rec <- do.call(rbind, lapply(split(ratio, ratio$dataset), function(d) {
+  ratio <- ratio[ratio$method %in% c("Proposed (TBS)", "Random"), ]
+  ratio <- do.call(rbind, lapply(split(ratio, interaction(ratio$dataset, ratio$method, drop = TRUE)), function(d) {
+    full <- d$acc_mean[d$bag_ratio == 1.0][1]
+    d$delta_acc <- d$acc_mean - full
+    d$rel_acc <- d$acc_mean / full * 100
+    d
+  }))
+  rec <- do.call(rbind, lapply(split(ratio[ratio$method == "Proposed (TBS)", ], ratio$dataset[ratio$method == "Proposed (TBS)"]), function(d) {
     best <- d[which.max(d$acc_mean), ]
+    full <- d[d$bag_ratio == 1.0, ][1, ]
     eff <- d[d$acc_mean >= best$acc_mean - 1, ]
-    eff <- eff[which.min(eff$instances), ]
+    eff <- eff[which.min(eff$bag_ratio), ]
     rbind(
-      data.frame(dataset = best$dataset, choice = "best_acc", ratio = best$bag_ratio, acc_mean = best$acc_mean, f1_mean = best$f1_mean, instances = best$instances),
-      data.frame(dataset = eff$dataset, choice = "efficient_1pp", ratio = eff$bag_ratio, acc_mean = eff$acc_mean, f1_mean = eff$f1_mean, instances = eff$instances)
+      data.frame(dataset = full$dataset, choice = "full", ratio = full$bag_ratio, delta_acc = full$delta_acc, rel_acc = full$rel_acc),
+      data.frame(dataset = best$dataset, choice = "best_acc", ratio = best$bag_ratio, delta_acc = best$delta_acc, rel_acc = best$rel_acc),
+      data.frame(dataset = eff$dataset, choice = "efficient_1pp", ratio = eff$bag_ratio, delta_acc = eff$delta_acc, rel_acc = eff$rel_acc)
     )
   }))
-  save_png(file.path(fig_dir, "fig17_pareto_frontier_submission.png"), 2300, 950)
-  par(mfrow = c(1, 2), mar = c(4.6, 4.4, 3.2, 1), oma = c(1.7, 0, 2, 0))
-  cols <- c("FruitsPark" = "#0f766e", "UrbanStreetTree" = "#b91c1c")
+  save_png(file.path(fig_dir, "fig17_pareto_frontier_submission.png"), 2400, 1000)
+  par(mfrow = c(1, 2), mar = c(5.0, 5.0, 3.2, 1.0), oma = c(0.4, 0, 2.4, 0),
+      cex.axis = 1.00, cex.lab = 1.08, cex.main = 1.18, las = 1)
+  cols <- c("Proposed (TBS)" = "#0f766e", "Random" = "#d96532")
+  pchs <- c("Proposed (TBS)" = 16, "Random" = 15)
+  ltys <- c("Proposed (TBS)" = 1, "Random" = 2)
   for (dataset in c("FruitsPark", "UrbanStreetTree")) {
     d <- ratio[ratio$dataset == dataset, ]
-    d <- d[order(d$instances), ]
-    color <- cols[[dataset]]
+    d <- d[order(d$bag_ratio), ]
     title_txt <- ifelse(dataset == "FruitsPark", "FruitsPark (val)", "UrbanStreetTree (test)")
-    x_max <- max(d$instances, na.rm = TRUE) * 1.08
-    plot(d$instances, d$acc_mean, type = "b", pch = 16, col = color, lwd = 2,
-         xlim = c(0, x_max), ylim = c(0, 102), xaxs = "i", yaxs = "i",
-         xlab = "Average instances per bag", ylab = "Accuracy (%)", main = title_txt)
-    lines(d$instances, d$acc_mean, type = "b", pch = 16, col = color, lwd = 2)
-    grid(col = "#e5e7eb")
+    y_lim <- range(d$rel_acc, na.rm = TRUE)
+    y_pad <- max(1.5, diff(y_lim) * 0.18)
+    plot(NA, xlim = c(0.08, 1.02), ylim = c(y_lim[1] - y_pad, y_lim[2] + y_pad),
+         xaxs = "i", yaxs = "i", xaxt = "n",
+         xlab = "Rate",
+         ylab = "Accuracy relative to full patch (%)", main = title_txt)
+    shown_rates <- seq(0.1, 1.0, by = 0.1)
+    axis(1, at = shown_rates, labels = sprintf("%.1f", shown_rates), cex.axis = 0.92)
+    abline(h = 100, lwd = 2.3, col = "#111827")
+    for (method in c("Proposed (TBS)", "Random")) {
+      dm <- d[d$method == method, ]
+      lines(dm$bag_ratio, dm$rel_acc, type = "b", pch = pchs[[method]],
+            col = cols[[method]], lwd = 2.4, lty = ltys[[method]])
+    }
     rd <- rec[rec$dataset == dataset, ]
-    best <- rd[rd$choice == "best_acc", ]
     eff <- rd[rd$choice == "efficient_1pp", ]
-    points(best$instances, best$acc_mean, pch = 1, cex = 2.0, lwd = 2.2)
-    points(eff$instances, eff$acc_mean, pch = 0, cex = 2.0, lwd = 2.2)
+    points(eff$ratio, eff$rel_acc, pch = 21, cex = 2.1, lwd = 2.2, bg = "white")
+    text(eff$ratio, eff$rel_acc, labels = sprintf("%.1f%%", eff$rel_acc),
+         cex = 0.82, pos = ifelse(eff$rel_acc > 100, 3, 1), offset = 0.8)
+    legend("bottomright", bty = "n", cex = 0.92,
+           legend = c("Proposed (TBS)", "Random", "Efficient point"),
+           col = c(cols[["Proposed (TBS)"]], cols[["Random"]], "#111827"),
+           lty = c(1, 2, NA), lwd = c(2.4, 2.4, NA), pch = c(16, 15, 21),
+           pt.bg = c(NA, NA, "white"))
   }
-  mtext("Patch-budget Pareto frontier at seed 42", outer = TRUE, cex = 1.1, font = 2)
-  legend("bottom", inset = -0.04, xpd = NA, horiz = TRUE, bty = "n", legend = c("Best accuracy", "Efficient <= 1pp"), pch = c(1, 0), pt.cex = 1.4, cex = 0.82)
+  mtext("Patch-budget Pareto frontier at seed 42", outer = TRUE, cex = 1.22, font = 2)
   dev.off()
 }
 
@@ -295,23 +372,19 @@ make_attention_localization <- function() {
   bp <- barplot(summ$U_tree_mean, ylim = c(0, 0.22), yaxs = "i", col = cols, border = "white",
                 names.arg = labels, las = 1, cex.names = 0.78, main = "Uniform tree mass", ylab = expression(U[tree]))
   arrows(bp, summ$U_tree_mean, bp, summ$U_tree_mean + summ$U_tree_std, angle = 90, length = 0.05, lwd = 1.3)
-  grid(nx = NA, ny = NULL, col = "#e5e7eb")
 
   bp <- barplot(summ$A_tree_mean, ylim = c(0, 0.30), yaxs = "i", col = cols, border = "white",
                 names.arg = labels, las = 1, cex.names = 0.78, main = "Attention tree mass", ylab = expression(A[tree]))
   arrows(bp, summ$A_tree_mean, bp, summ$A_tree_mean + summ$A_tree_std, angle = 90, length = 0.05, lwd = 1.3)
-  grid(nx = NA, ny = NULL, col = "#e5e7eb")
 
   bp <- barplot(summ$Delta_tree_mean, ylim = c(0, 0.12), yaxs = "i", col = cols, border = "white",
                 names.arg = labels, las = 1, cex.names = 0.78, main = expression(paste("Attention-uniform gap, ", Delta[tree])), ylab = expression(Delta[tree]))
   arrows(bp, summ$Delta_tree_mean, bp, summ$Delta_tree_mean + summ$Delta_tree_std, angle = 90, length = 0.05, lwd = 1.3)
-  grid(nx = NA, ny = NULL, col = "#e5e7eb")
 
   lift_list <- lapply(conditions, function(cnd) per_img$Lift_tree[per_img$condition == cnd])
   names(lift_list) <- labels
   boxplot(lift_list, col = cols, border = "#374151", las = 1, cex.axis = 0.78, main = expression(paste("Relative attention lift, ", L[tree])), ylab = expression(L[tree]))
   abline(h = 1, lty = 2, col = "#111827")
-  grid(nx = NA, ny = NULL, col = "#e5e7eb")
 
   mtext("Attention localization on tree-mask regions (UrbanStreetTree, four-seed average, n = 143 images)", outer = TRUE, cex = 1.0, font = 2)
   dev.off()
@@ -320,6 +393,7 @@ make_attention_localization <- function() {
 make_framework()
 make_overall()
 make_depth_delta()
+make_sampling_seed_comparison()
 make_condition_ablation()
 make_foreground_diagnostics()
 make_pareto()
