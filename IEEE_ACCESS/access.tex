@@ -751,9 +751,9 @@ estimator and therefore provides a better accuracy--cost trade-off. We therefore
 Hybrid. The depth model is not used at inference; it only constructs training-time background
 perturbations.
 
-\begin{table*}[t]
+\begin{figure*}[!tbp]
 \centering
-\caption{Depth-source screening for DepthAug at $\rho=0.3$ using symmetric validation regret. For
+\captionof{table}{Depth-source screening for DepthAug at $\rho=0.3$ using symmetric validation regret. For
          each depth source, FP and UST regret are the gaps from the dataset-wise best validation
          accuracy (FP best: 90.00\% by Marigold; UST best: 99.33\% by MiDaS Large and ZoeDepth). Max
          regret is the larger of the two gaps. Highlighted rows show the two depth sources with the
@@ -776,18 +776,16 @@ LeReS              & 80.00 & 95.30 & 10.00 & 4.03 & 10.00 & --- \\
 MiDaS Large        & 79.05 & \textbf{99.33} & 10.95 & 0.00 & 10.95 & --- \\
 \bottomrule
 \end{tabular}}
-\end{table*}
-
-\begin{figure*}[t]
-\centering
+\vspace{8pt}
 \includegraphics[width=0.62\textwidth]{figures/fig23_depth_model_comparison.png}
-\caption{Validation accuracy on FruitsPark (x-axis) and UrbanStreetTree (y-axis) for ten
+\captionof{figure}{Validation accuracy on FruitsPark (x-axis) and UrbanStreetTree (y-axis) for ten
          depth-source estimators used by DepthAug at $\rho=0.3$. Depth-source selection is based on
          cross-dataset stability. MiDaS Hybrid has the second-highest cross-dataset stability after
          Marigold and is selected for its practical cost as a single-pass feed-forward estimator.}
 \label{fig:depth_model_comparison}
 \end{figure*}
 
+\FloatBarrier
 \section{Results}
 \label{sec:results}
 The results are presented from predictive performance to deployment efficiency: overall
@@ -814,9 +812,9 @@ subsequent sparse-selection analysis in
 Table~\ref{tab:sampling_seed_ablation}, where random sparse sampling, TBS sparse sampling, and TBS
 sparse sampling with DepthAug are compared across four sampling seeds (42--45).
 
-\begin{table*}[!tbp]
+\begin{figure*}[!tbp]
 \centering
-\caption{Results under the same training and evaluation settings within each backbone family;
+\captionof{table}{Results under the same training and evaluation settings within each backbone family;
          sparse MIL entries use sampling seed 42 where applicable. Values are percentages.
          FruitsPark is evaluated on validation; UrbanStreetTree is evaluated on test. Values in
          parentheses indicate percentage-point differences relative to the reported Image-level GAP
@@ -861,17 +859,14 @@ Sparse MIL & Swin MIL & $83.81$ \gain{3.33} & $83.46$ \gain{3.96} & $88.81$ \gai
 Sparse DepthAug & Swin DepthAug & $84.29$ \gain{3.81} & $84.15$ \gain{4.65} & $91.61$ \gain{23.08} & $89.75$ \gain{23.63} \\
 \bottomrule
 \end{tabular}}
-\end{table*}
-
-\begin{figure*}[!tbp]
-\centering
+\vspace{8pt}
 \includegraphics[width=\textwidth]{figures/fig15_overall_comparison_selected.png}
-\caption{Representative macro-$F_1$ comparison. Model labels identify image-level GAP baselines,
+\captionof{figure}{Representative macro-$F_1$ comparison. Model labels identify image-level GAP baselines,
          sparse MIL models, and sparse MIL models trained with DepthAug; DA denotes DepthAug.}
 \label{fig:overall_rank}
 \end{figure*}
 
-\subsubsection{Effect of Depth-Guided Augmentation}
+\subsection{Effect of Depth-Guided Augmentation}
 DepthAug is more clearly beneficial on UrbanStreetTree than on FruitsPark. Relative to the
 corresponding sparse MIL model, macro-$F_1$ changes are +2.60 percentage points for ViT, +2.41 for
 DINOv1, -0.99 for DINOv2, +3.01 for DINOv3, and +3.97 for Swin. This supports the interpretation
@@ -948,7 +943,7 @@ regularizer rather than as a uniformly beneficial component.
 \label{fig:sampling_seed_comparison}
 \end{figure*}
 
-\subsubsection{Attention-Localization Evidence}
+\subsection{Attention-Localization Evidence}
 \label{sec:attention_localization_results}
 To examine whether these performance gains correspond to greater emphasis on tree evidence, we next
 analyze attention localization.
@@ -1138,7 +1133,7 @@ regions.
 \label{fig:foreground_diagnostics}
 \end{figure*}
 
-\subsubsection{Learning Efficiency}
+\subsection{Learning Efficiency}
 Table~\ref{tab:learning_efficiency} and Fig.~\ref{fig:learning_efficiency} summarize the
 learning-efficiency analysis for ViT TBS sparse MIL with DepthAug (sampling seed 42). This analysis
 compares the full-patch setting ($\rho=1.0$) with two sparse operating points: the aggressive
