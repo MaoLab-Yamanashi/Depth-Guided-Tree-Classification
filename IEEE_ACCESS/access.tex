@@ -3,12 +3,15 @@
 \usepackage{cite}
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{graphicx}
+\usepackage{stfloats}
 \usepackage{booktabs}
 \usepackage{colortbl}
 \definecolor{CandidateRow}{RGB}{219,234,254}
 \definecolor{SoftRule}{gray}{0.55}
 \usepackage{multirow}
 \usepackage{array}
+\usepackage{capt-of}
+\usepackage{placeins}
 \usepackage{url}
 \usepackage{textcomp}
 
@@ -787,8 +790,12 @@ MiDaS Large        & 79.05 & \textbf{99.33} & 10.95 & 0.00 & 10.95 & --- \\
 
 \section{Results}
 \label{sec:results}
+The results are presented from predictive performance to deployment efficiency: overall
+performance, the effectiveness of sparse selection, the accuracy--computation Pareto trade-off,
+and inference-time GPU memory efficiency.
 
 \subsection{Overall Comparison}
+\label{sec:overall_results}
 Table~\ref{tab:overall_results} reports the fixed-budget backbone comparison. On UrbanStreetTree,
 sparse MIL improves over the corresponding image-level ViT GAP baseline, and DepthAug provides a
 further gain. ViT DepthAug achieves the best result in this fixed-budget comparison, with 95.80\%
@@ -802,11 +809,12 @@ representative protocol to keep the architecture sweep computationally tractable
 configurations, seed 42 denotes the stochastic sparse-patch sampling seed, including the random part
 of TBS and the random sparse baseline, not a post hoc choice of a favorable model-initialization
 seed. The comparison is therefore intended to summarize cross-architecture tendencies under a common
-protocol. The statistical robustness of the core sparse-selection claim is evaluated separately in
+protocol. The statistical robustness of the core sparse-selection claim is evaluated in the
+subsequent sparse-selection analysis in
 Table~\ref{tab:sampling_seed_ablation}, where random sparse sampling, TBS sparse sampling, and TBS
 sparse sampling with DepthAug are compared across four sampling seeds (42--45).
 
-\begin{table*}[t]
+\begin{table*}[!tbp]
 \centering
 \caption{Results under the same training and evaluation settings within each backbone family;
          sparse MIL entries use sampling seed 42 where applicable. Values are percentages.
@@ -855,7 +863,7 @@ Sparse DepthAug & Swin DepthAug & $84.29$ \gain{3.81} & $84.15$ \gain{4.65} & $9
 \end{tabular}}
 \end{table*}
 
-\begin{figure*}[t]
+\begin{figure*}[!tbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig15_overall_comparison_selected.png}
 \caption{Representative macro-$F_1$ comparison. Model labels identify image-level GAP baselines,
@@ -863,7 +871,7 @@ Sparse DepthAug & Swin DepthAug & $84.29$ \gain{3.81} & $84.15$ \gain{4.65} & $9
 \label{fig:overall_rank}
 \end{figure*}
 
-\subsection{Effect of Depth-Guided Augmentation}
+\subsubsection{Effect of Depth-Guided Augmentation}
 DepthAug is more clearly beneficial on UrbanStreetTree than on FruitsPark. Relative to the
 corresponding sparse MIL model, macro-$F_1$ changes are +2.60 percentage points for ViT, +2.41 for
 DINOv1, -0.99 for DINOv2, +3.01 for DINOv3, and +3.97 for Swin. This supports the interpretation
@@ -877,7 +885,7 @@ image-level foundation models may benefit from stable domain regularities. We th
 FruitsPark as a secondary validation of the method's behavior rather than as the sole basis for a
 superiority claim.
 
-\begin{figure*}[t]
+\begin{figure*}[!tbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig16_depth_aug_delta_submission.png}
 \caption{DepthAug delta relative to corresponding sparse MIL models. Values are macro-$F_1$
@@ -886,13 +894,14 @@ superiority claim.
 \label{fig:depth_delta}
 \end{figure*}
 
-\subsection{Sparse-Selection Ablation}
+\subsection{Effectiveness of Sparse Selection}
+\label{sec:sparse_selection_results}
 The fixed-budget sparse-selection diagnostic in Table~\ref{tab:sampling_seed_ablation} and
-Fig.~\ref{fig:sampling_seed_comparison} tests whether TBS is useful beyond patch-count reduction
+Fig.~\ref{fig:sampling_seed_comparison} test whether TBS is useful beyond patch-count reduction
 alone. This experiment fixes the learning seed and varies the sparse-sampling seed over four values
 (42--45). The full train/full evaluation condition is available for all four seeds on both datasets.
 
-\begin{table*}[t]
+\begin{table*}[!tbp]
 \centering
 \caption{Fixed-budget sparse-selection diagnostic with seed-controlled sampling. Accuracy and
          macro-$F_1$ are percentages. Epoch time is reported in minutes.}
@@ -928,7 +937,7 @@ performance in this particular sampling-seed diagnostic, despite improving most 
 overall comparison. We therefore interpret DepthAug as a useful but dataset- and protocol-dependent
 regularizer rather than as a uniformly beneficial component.
 
-\begin{figure*}[t]
+\begin{figure*}[!tbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig24_sampling_seed_comparison.png}
 \caption{Fixed-budget sparse-selection diagnostic under four seed-controlled sampling settings.
@@ -939,205 +948,15 @@ regularizer rather than as a uniformly beneficial component.
 \label{fig:sampling_seed_comparison}
 \end{figure*}
 
-\subsection{Pareto Efficiency of Sparse Patch Selection}
-Table~\ref{tab:pareto} and Fig.~\ref{fig:pareto_overview} summarize the ViT Pareto efficiency
-experiment, which sweeps the bag ratio $\rho$ and compares trunk-biased selection with random
-selection at each budget. On UrbanStreetTree, the best accuracy is obtained at $\rho=0.6$, with
-97.90\% accuracy and 97.73\% macro-$F_1$ using 244.5 instances; this is also the efficient operating
-point, because no lower bag ratio comes within one percentage point of it. Reducing the budget here
-even improves over full selection: $\rho=1.0$ uses 407.8 instances yet reaches only 93.71\%
-accuracy, 4.20 percentage points below $\rho=0.6$. On FruitsPark, accuracy saturates for
-$\rho\gtrsim0.6$: the best accuracy is 93.81\% (reached at $\rho=0.7$ and at $\rho=1.0$), and the
-efficient point $\rho=0.6$ stays within 0.48 percentage points of the best while using 40.0 rather
-than 66.0 instances, a 39.4\% reduction. At a matched budget, trunk-biased selection exceeds random
-selection by 2.80 percentage points on UrbanStreetTree and 0.95 percentage points on FruitsPark at
-$\rho=0.6$. These are fixed sampling-seed (42) results, so they characterize a practical operating
-point rather than provide uncertainty estimates over sampling variability; the Pareto result should
-be read as a practical operating-point analysis rather than a claim that the smallest bag is always
-optimal.
-
-\begin{table*}[t]
-\centering
-\caption{Pareto operating points for ViT TBS sparse MIL with DepthAug (sampling seed 42). The
-         efficient point is the lowest-instance bag ratio within one percentage point of the best
-         observed accuracy. Random selection at the same bag ratio and the full-patch setting are
-         shown for reference.}
-\label{tab:pareto}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{llccccc}
-\toprule
-Dataset & Setting & Bag ratio & Accuracy (\%) & Macro-$F_1$ (\%) & Instances & Train (h) \\
-\midrule
-FruitsPark & Proposed, efficient & 0.6 & 93.33 & 93.31 & 40.0 & 0.61 \\
-FruitsPark & Random, same budget & 0.6 & 92.38 & 92.40 & 40.0 & 0.62 \\
-FruitsPark & Proposed, full & 1.0 & 93.81 & 93.75 & 66.0 & 0.91 \\
-UrbanStreetTree & Proposed, efficient & 0.6 & \textbf{97.90} & \textbf{97.73} & 244.5 & 4.66 \\
-UrbanStreetTree & Random, same budget & 0.6 & 95.10 & 94.27 & 244.5 & 4.69 \\
-UrbanStreetTree & Proposed, full & 1.0 & 93.71 & 92.53 & 407.8 & 7.07 \\
-\bottomrule
-\end{tabular}}
-\end{table*}
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=\textwidth]{figures/fig17_pareto_frontier_submission.png}
-\caption{Patch-budget Pareto frontier for ViT TBS sparse MIL with DepthAug (sampling seed 42),
-         plotting accuracy normalized by the corresponding full-patch setting at $\rho=1.0$
-         (full patch = 100\%). The horizontal 100\% line indicates no change from full-patch
-         accuracy; values above 100\% indicate gains and values below 100\% indicate losses.
-         Trunk-biased selection (Proposed) is compared with random selection at each sampling rate
-         using distinct markers and line styles.}
-\label{fig:pareto_overview}
-\end{figure*}
-
-Because UrbanStreetTree provides segmentation masks for the test split, we further diagnose whether
-sparse bags preserve foreground tree evidence. Fig.~\ref{fig:foreground_diagnostics} reports
-foreground coverage and patch--foreground IoU across bag ratios. Foreground coverage increases
-monotonically as $\rho$ grows: the efficient $\rho=0.6$ setting covers 76.4\% of annotated
-foreground pixels, $\rho=0.7$ covers 84.3\%, and full selection covers 99.2\%. However, this
-additional coverage does not translate into higher accuracy: full selection covers nearly all
-foreground pixels yet gives 4.20 percentage points lower test accuracy than $\rho=0.6$ in
-Table~\ref{tab:pareto}, and patch--foreground IoU saturates around 9--10\%. The low saturation level
-of patch--foreground IoU should not be interpreted as poor foreground recovery; rather, it reflects
-the geometric fact that rectangular patches inevitably include substantial background around thin
-tree structures such as trunks and branches. Thus, sparse selection improves the operating point by
-retaining sufficient foreground coverage while limiting the growth of background-dominant patch
-regions.
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=\textwidth]{figures/fig19_foreground_diagnostics_by_ratio.png}
-\caption{UrbanStreetTree foreground diagnostics across sparse bag ratios using segmentation masks.
-         Coverage increases with the bag ratio, while patch--foreground IoU saturates around
-         9--10\%. The low IoU reflects the geometric fact that rectangular patches around thin tree
-         structures inevitably include substantial background, not poor foreground recovery.}
-\label{fig:foreground_diagnostics}
-\end{figure*}
-
-\subsection{Learning Efficiency}
-Table~\ref{tab:learning_efficiency} and Fig.~\ref{fig:learning_efficiency} summarize the
-learning-efficiency analysis for ViT TBS sparse MIL with DepthAug (sampling seed 42). This analysis
-compares the full-patch setting ($\rho=1.0$) with two sparse operating points: the aggressive
-$\rho=0.3$ budget used in the main fixed-budget comparison, and the balanced $\rho=0.6$ point
-identified as Pareto-efficient. We report validation accuracy, total training time, and the
-estimated number of processed training patches. Because the comparison uses a fixed training and
-evaluation setup rather than repeated training runs, we report total wall-clock training time rather
-than time-to-best, which is sensitive to the exact best-validation epoch.
-
-On UrbanStreetTree, both sparse budgets improve over the full-patch best validation accuracy of
-97.32\%, reaching 99.33\%. The aggressive $\rho=0.3$ budget cuts total training time by 61.2\%
-(424.4 to 164.8 min) and processed patches by 69.9\% (29.2M to 8.8M), while the balanced $\rho=0.6$
-budget cuts them by 34.1\% and 40.0\%, respectively. The time to reach 95\% of the full-patch best
-accuracy drops from 43.0 min to 18.0 min at $\rho=0.3$ and to 28.0 min at $\rho=0.6$.
-
-FruitsPark exposes the accuracy--efficiency tradeoff between the two budgets. The balanced
-$\rho=0.6$ point preserves accuracy (93.33\% versus the full-patch 93.81\%) while cutting training
-time by 33.3\% and processed patches by 39.4\%, and reaches 95\% of the full-patch best accuracy in
-comparable time (18.6 versus 17.4 min). The aggressive $\rho=0.3$ budget roughly doubles the savings
-(51.1\% time, 69.7\% patches) but reduces best validation accuracy to 89.05\% (a 4.76-point drop)
-and does not reach 95\% of the full-patch best accuracy. Thus $\rho=0.6$ is the accuracy-preserving
-operating point, while $\rho=0.3$ maximizes efficiency when a modest accuracy loss is acceptable.
-
-\begin{table*}[t]
-\centering
-\caption{Learning-efficiency comparison for ViT TBS sparse MIL with DepthAug (sampling seed 42), at
-         the aggressive $\rho=0.3$ and balanced $\rho=0.6$ sparse budgets against full-patch
-         training. Validation accuracy is reported for both datasets, as it is the per-epoch metric
-         tracked during training; the test-set accuracy used elsewhere for UrbanStreetTree appears
-         in Tables~\ref{tab:pareto} and \ref{tab:inference_efficiency}. Time-to-target is the time
-         required to reach 95\% of the full-patch best validation accuracy; the FruitsPark
-         $\rho=0.3$ setting does not reach this target ($-$).}
-\label{tab:learning_efficiency}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{lcccccc}
-\toprule
-Dataset & Bag ratio & Best val acc (\%) & Total time (min) & Total patches (M) & Time to target (min) & Efficiency interpretation \\
-\midrule
-FruitsPark & 0.3 & 89.05 & 26.7 & 0.70 & $-$ & $-$4.76 pp, $-$51.1\% time, $-$69.7\% patches \\
-FruitsPark & 0.6 & 93.33 & 36.5 & 1.39 & 18.6 & $-$0.48 pp, $-$33.3\% time, $-$39.4\% patches \\
-FruitsPark & 1.0 & 93.81 & 54.6 & 2.30 & 17.4 & Full-patch reference \\
-UrbanStreetTree & 0.3 & 99.33 & 164.8 & 8.78 & 18.0 & $+$2.01 pp, $-$61.2\% time, $-$69.9\% patches \\
-UrbanStreetTree & 0.6 & 99.33 & 279.6 & 17.50 & 28.0 & $+$2.01 pp, $-$34.1\% time, $-$40.0\% patches \\
-UrbanStreetTree & 1.0 & 97.32 & 424.4 & 29.19 & 43.0 & Full-patch reference \\
-\bottomrule
-\end{tabular}}
-\end{table*}
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=\textwidth]{figures/fig21_learning_efficiency_main.png}
-\caption{Learning-efficiency curves for ViT TBS sparse MIL with DepthAug (sampling seed 42),
-         comparing the aggressive ($\rho=0.3$) and balanced ($\rho=0.6$) sparse budgets with
-         full-patch training ($\rho=1.0$). Wall-clock time and estimated processed patches provide
-         more direct efficiency comparisons than epoch count alone because sparse bags process fewer
-         instances per epoch.}
-\label{fig:learning_efficiency}
-\end{figure*}
-
-\subsection{Inference Efficiency}
-Table~\ref{tab:inference_efficiency} reports end-to-end inference timing for the ViT sparse MIL
-family. The benchmark includes patch generation and selection, GPU transfer, feature extraction, and
-MIL aggregation, so it is a deployment-oriented measurement rather than a backbone-only timing
-proxy. Accuracy is a fixed sampling-seed (42) point estimate, while latency and peak memory are
-measured over 50 images after warm-up.
-
-Compared with full-patch inference, the balanced $\rho=0.6$ setting reduces FruitsPark latency from
-$115.97\pm2.34$ ms/image to $82.46\pm3.79$ ms/image (a 1.41$\times$ speedup, 28.9\% reduction) and
-peak GPU memory by 11.2\% (224.7 to 199.6 MB), with accuracy essentially unchanged (a
-0.48-percentage-point decrease); the aggressive $\rho=0.3$ setting reduces latency to $65.70\pm0.88$
-ms/image (1.77$\times$, 43.3\%) and memory by 18.5\% (to 183.2 MB), at a 3.81-percentage-point
-accuracy cost. On UrbanStreetTree the savings are larger and accuracy improves in both cases:
-$\rho=0.6$ cuts latency from $588.52\pm92.89$ ms/image to $466.89\pm69.08$ ms/image (1.26$\times$,
-20.7\%) and memory by 27.9\% (542.0 to 390.8 MB) while improving accuracy by 4.19 percentage points,
-and $\rho=0.3$ cuts latency to $370.31\pm57.34$ ms/image (1.59$\times$, 37.1\%) and memory by 48.4\%
-(to 279.6 MB) while still improving accuracy by 2.79 percentage points.
-
-Fig.~\ref{fig:inference_breakdown} explains why the realized speedup is smaller than the patch-count
-reduction. Sparse inference substantially reduces the model-forward component, from 20.7 ms at full
-patch to 13.0 ms at $\rho=0.6$ and 9.2 ms at $\rho=0.3$ on FruitsPark, and from 99.2 ms to 63.0 ms
-and 33.6 ms on UrbanStreetTree. However, patch preparation and TBS selection remain the dominant
-cost, especially on UrbanStreetTree. Random sparse sampling is faster because it avoids the
-tree-focused selection cost, but it is used here only as an overhead diagnostic; the main comparison
-is between full-patch inference and the proposed structurally biased sparse inference.
-
-\begin{table*}[t]
-\centering
-\caption{End-to-end inference-efficiency comparison for ViT (sampling seed 42; latency over 50 images
-         after warm-up) at the balanced $\rho=0.6$ and aggressive $\rho=0.3$ budgets. The $\rho=0.3$
-         and $\rho=0.6$ latencies are from separate timing sessions on the same hardware; speedups
-         use the $\rho=0.6$-session full-patch latency as the common reference. Accuracy is final
-         validation accuracy for FruitsPark and final test accuracy for UrbanStreetTree.}
-\label{tab:inference_efficiency}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{llccccc}
-\toprule
-Dataset & Method & Bag ratio & Final acc (\%) & Latency / image (ms) & Speedup & Peak GPU mem (MB) \\
-\midrule
-FruitsPark & Full Patch & 1.0 & 93.81 & $115.97\pm2.34$ & 1.00$\times$ & 224.7 \\
-FruitsPark & Proposed Sparse & 0.6 & 93.33 & $82.46\pm3.79$ & 1.41$\times$ & 199.6 \\
-FruitsPark & Proposed Sparse & 0.3 & 90.00 & $65.70\pm0.88$ & 1.77$\times$ & 183.2 \\
-UrbanStreetTree & Full Patch & 1.0 & 93.71 & $588.52\pm92.89$ & 1.00$\times$ & 542.0 \\
-UrbanStreetTree & Proposed Sparse & 0.6 & 97.90 & $466.89\pm69.08$ & 1.26$\times$ & 390.8 \\
-UrbanStreetTree & Proposed Sparse & 0.3 & 96.50 & $370.31\pm57.34$ & 1.59$\times$ & 279.6 \\
-\bottomrule
-\end{tabular}}
-\end{table*}
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=\textwidth]{figures/fig22_inference_latency_breakdown.png}
-\caption{Inference latency breakdown for full patch and proposed sparse selection at $\rho=0.6$ and
-         $\rho=0.3$. Sparse patch usage reduces model-forward time, but the overall speedup is
-         partly limited by patch preparation and structurally biased selection overhead.}
-\label{fig:inference_breakdown}
-\end{figure*}
-
-\subsection{Qualitative and Attention Localization Analysis}
+\subsubsection{Attention-Localization Evidence}
+\label{sec:attention_localization_results}
+To examine whether these performance gains correspond to greater emphasis on tree evidence, we next
+analyze attention localization.
 Attention visualizations can be useful diagnostics for checking whether high-weight patches
 correspond to trunks, branches, or background regions. However, attention weights should not be
 treated as causal explanations by themselves \cite{attentionnotexplanation}. For this reason, we use
 attention behavior only as supporting diagnostic evidence and base the main claims on the
-quantitative comparison, the Pareto analysis, the fixed-budget multi-seed diagnostic, and the
+quantitative comparison, the fixed-budget multi-seed diagnostic, the Pareto analysis, and the
 measured efficiency analyses. Selected-patch visualizations are most informative when generated from
 the exact TBS-DepthAug setting used in the quantitative experiments; visualizations from earlier
 preliminary configurations are therefore not used as primary evidence.
@@ -1182,10 +1001,11 @@ DepthAug, $1.02\times10^{-5}$; random sparse vs.\ TBS sparse with DepthAug, $5.0
 DepthAug therefore reduces, but does not eliminate, the localization benefit of TBS sparse selection
 on this dataset, while test accuracy and macro-$F_1$ also decrease relative to plain TBS sparse,
 consistent with the seed-level means already reported in Table~\ref{tab:sampling_seed_ablation}.
-This matches the sampling-seed diagnostic in Section~\ref{sec:discussion}, which already shows that
-DepthAug's benefit on UrbanStreetTree is dataset- and protocol-dependent rather than uniform: across
-the four sampling seeds, plain TBS sparse selection gives both the strongest localization signal and
-the best accuracy, whereas adding DepthAug attenuates both.
+This matches the preceding sampling-seed diagnostic in
+Section~\ref{sec:sparse_selection_results}: DepthAug's benefit on UrbanStreetTree is dataset- and
+protocol-dependent rather than uniform. Across the four sampling seeds, plain TBS sparse selection
+gives both the strongest localization signal and the best accuracy, whereas adding DepthAug
+attenuates both.
 
 Fig.~\ref{fig:attention_localization_summary} shows the same four quantities after averaging each
 image across the four sampling seeds, and
@@ -1195,9 +1015,9 @@ show one representative test image per class from the seed-42 checkpoints (two-p
 ratio to avoid showing only visually convenient cases, together with the tree mask and the ABMIL
 attention heatmap under each condition.
 
-\begin{table*}[!t]
+\begin{figure*}[!tbp]
 \centering
-\caption{Attention localization diagnostic on the UrbanStreetTree test split. Localization metrics
+\captionof{table}{Attention localization diagnostic on the UrbanStreetTree test split. Localization metrics
          are averaged across four sampling seeds for each of 143 test images. Metrics are defined in
          Eq.~(\ref{eq:attention_metrics}): $U_{\text{tree}}$ is the uniform-weighting reference
          conditional on the selected bag, $A_{\text{tree}}$ the ABMIL attention mass on tree
@@ -1207,7 +1027,7 @@ attention heatmap under each condition.
          seed-level mean $\pm$ std, matching Table~\ref{tab:sampling_seed_ablation}.}
 \label{tab:attention_localization}
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{lccccccc}
+\begin{tabular}{lcccccc}
 \toprule
 Condition & $U_{\text{tree}}$ & $A_{\text{tree}}$ & $\Delta_{\text{tree}}$ & $L_{\text{tree}}$ (median [IQR]) & Accuracy (\%) & Macro-$F_1$ (\%) \\
 \midrule
@@ -1216,12 +1036,9 @@ TBS sparse & $0.098\pm0.090$ & $0.148\pm0.110$ & $0.051\pm0.050$ & 1.58 [1.19, 1
 TBS sparse + DepthAug & $0.098\pm0.090$ & $0.138\pm0.099$ & $0.041\pm0.044$ & 1.46 [1.18, 1.78] & $88.64\pm3.49$ & $87.01\pm3.52$ \\
 \bottomrule
 \end{tabular}}
-\end{table*}
-
-\begin{figure*}[!t]
-\centering
+\vspace{8pt}
 \includegraphics[width=\textwidth]{figures/fig25_attention_localization_summary.png}
-\caption{Attention localization metrics on the UrbanStreetTree test split, averaged across four
+\captionof{figure}{Attention localization metrics on the UrbanStreetTree test split, averaged across four
          sampling seeds for each of 143 images. TBS sparse selection raises $A_{\mathrm{tree}}$ and
          $L_{\mathrm{tree}}$ relative to random sparse selection; adding DepthAug attenuates this
          benefit but does not remove it.}
@@ -1248,6 +1065,195 @@ TBS sparse + DepthAug & $0.098\pm0.090$ & $0.138\pm0.099$ & $0.041\pm0.044$ & 1.
 \label{fig:attention_localization_qualitative_b}
 \end{figure*}
 
+\subsection{Accuracy--Computation Pareto Efficiency}
+\label{sec:pareto_efficiency_results}
+Table~\ref{tab:pareto} and Fig.~\ref{fig:pareto_overview} summarize the ViT Pareto efficiency
+experiment, which sweeps the bag ratio $\rho$ and compares trunk-biased selection with random
+selection at each budget. On UrbanStreetTree, the best accuracy is obtained at $\rho=0.6$, with
+97.90\% accuracy and 97.73\% macro-$F_1$ using 244.5 instances; this is also the efficient operating
+point, because no lower bag ratio comes within one percentage point of it. Reducing the budget here
+even improves over full selection: $\rho=1.0$ uses 407.8 instances yet reaches only 93.71\%
+accuracy, 4.20 percentage points below $\rho=0.6$. On FruitsPark, accuracy saturates for
+$\rho\gtrsim0.6$: the best accuracy is 93.81\% (reached at $\rho=0.7$ and at $\rho=1.0$), and the
+efficient point $\rho=0.6$ stays within 0.48 percentage points of the best while using 40.0 rather
+than 66.0 instances, a 39.4\% reduction. At a matched budget, trunk-biased selection exceeds random
+selection by 2.80 percentage points on UrbanStreetTree and 0.95 percentage points on FruitsPark at
+$\rho=0.6$. These are fixed sampling-seed (42) results, so they characterize a practical operating
+point rather than provide uncertainty estimates over sampling variability; the Pareto result should
+be read as a practical operating-point analysis rather than a claim that the smallest bag is always
+optimal.
+
+\begin{figure*}[!tbp]
+\centering
+\captionof{table}{Pareto operating points for ViT TBS sparse MIL with DepthAug (sampling seed 42). The
+         efficient point is the lowest-instance bag ratio within one percentage point of the best
+         observed accuracy. Random selection at the same bag ratio and the full-patch setting are
+         shown for reference.}
+\label{tab:pareto}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llccccc}
+\toprule
+Dataset & Setting & Bag ratio & Accuracy (\%) & Macro-$F_1$ (\%) & Instances & Train (h) \\
+\midrule
+FruitsPark & Proposed, efficient & 0.6 & 93.33 & 93.31 & 40.0 & 0.61 \\
+FruitsPark & Random, same budget & 0.6 & 92.38 & 92.40 & 40.0 & 0.62 \\
+FruitsPark & Proposed, full & 1.0 & 93.81 & 93.75 & 66.0 & 0.91 \\
+UrbanStreetTree & Proposed, efficient & 0.6 & \textbf{97.90} & \textbf{97.73} & 244.5 & 4.66 \\
+UrbanStreetTree & Random, same budget & 0.6 & 95.10 & 94.27 & 244.5 & 4.69 \\
+UrbanStreetTree & Proposed, full & 1.0 & 93.71 & 92.53 & 407.8 & 7.07 \\
+\bottomrule
+\end{tabular}}
+\vspace{8pt}
+\includegraphics[width=\textwidth]{figures/fig17_pareto_frontier_submission.png}
+\captionof{figure}{Patch-budget Pareto frontier for ViT TBS sparse MIL with DepthAug (sampling seed 42),
+         plotting accuracy normalized by the corresponding full-patch setting at $\rho=1.0$
+         (full patch = 100\%). The horizontal 100\% line indicates no change from full-patch
+         accuracy; values above 100\% indicate gains and values below 100\% indicate losses.
+         Trunk-biased selection (Proposed) is compared with random selection at each sampling rate
+         using distinct markers and line styles.}
+\label{fig:pareto_overview}
+\end{figure*}
+
+Because UrbanStreetTree provides segmentation masks for the test split, we further diagnose whether
+sparse bags preserve foreground tree evidence. Fig.~\ref{fig:foreground_diagnostics} reports
+foreground coverage and patch--foreground IoU across bag ratios. Foreground coverage increases
+monotonically as $\rho$ grows: the efficient $\rho=0.6$ setting covers 76.4\% of annotated
+foreground pixels, $\rho=0.7$ covers 84.3\%, and full selection covers 99.2\%. However, this
+additional coverage does not translate into higher accuracy: full selection covers nearly all
+foreground pixels yet gives 4.20 percentage points lower test accuracy than $\rho=0.6$ in
+Table~\ref{tab:pareto}, and patch--foreground IoU saturates around 9--10\%. The low saturation level
+of patch--foreground IoU should not be interpreted as poor foreground recovery; rather, it reflects
+the geometric fact that rectangular patches inevitably include substantial background around thin
+tree structures such as trunks and branches. Thus, sparse selection improves the operating point by
+retaining sufficient foreground coverage while limiting the growth of background-dominant patch
+regions.
+
+\begin{figure*}[!tbp]
+\centering
+\includegraphics[width=\textwidth]{figures/fig19_foreground_diagnostics_by_ratio.png}
+\caption{UrbanStreetTree foreground diagnostics across sparse bag ratios using segmentation masks.
+         Coverage increases with the bag ratio, while patch--foreground IoU saturates around
+         9--10\%. The low IoU reflects the geometric fact that rectangular patches around thin tree
+         structures inevitably include substantial background, not poor foreground recovery.}
+\label{fig:foreground_diagnostics}
+\end{figure*}
+
+\subsubsection{Learning Efficiency}
+Table~\ref{tab:learning_efficiency} and Fig.~\ref{fig:learning_efficiency} summarize the
+learning-efficiency analysis for ViT TBS sparse MIL with DepthAug (sampling seed 42). This analysis
+compares the full-patch setting ($\rho=1.0$) with two sparse operating points: the aggressive
+$\rho=0.3$ budget used in the main fixed-budget comparison, and the balanced $\rho=0.6$ point
+identified as Pareto-efficient. We report validation accuracy, total training time, and the
+estimated number of processed training patches. Because the comparison uses a fixed training and
+evaluation setup rather than repeated training runs, we report total wall-clock training time rather
+than time-to-best, which is sensitive to the exact best-validation epoch.
+
+On UrbanStreetTree, both sparse budgets improve over the full-patch best validation accuracy of
+97.32\%, reaching 99.33\%. The aggressive $\rho=0.3$ budget cuts total training time by 61.2\%
+(424.4 to 164.8 min) and processed patches by 69.9\% (29.2M to 8.8M), while the balanced $\rho=0.6$
+budget cuts them by 34.1\% and 40.0\%, respectively. The time to reach 95\% of the full-patch best
+accuracy drops from 43.0 min to 18.0 min at $\rho=0.3$ and to 28.0 min at $\rho=0.6$.
+
+FruitsPark exposes the accuracy--efficiency tradeoff between the two budgets. The balanced
+$\rho=0.6$ point preserves accuracy (93.33\% versus the full-patch 93.81\%) while cutting training
+time by 33.3\% and processed patches by 39.4\%, and reaches 95\% of the full-patch best accuracy in
+comparable time (18.6 versus 17.4 min). The aggressive $\rho=0.3$ budget roughly doubles the savings
+(51.1\% time, 69.7\% patches) but reduces best validation accuracy to 89.05\% (a 4.76-point drop)
+and does not reach 95\% of the full-patch best accuracy. Thus $\rho=0.6$ is the accuracy-preserving
+operating point, while $\rho=0.3$ maximizes efficiency when a modest accuracy loss is acceptable.
+
+\begin{figure*}[!tbp]
+\centering
+\captionof{table}{Learning-efficiency comparison for ViT TBS sparse MIL with DepthAug (sampling seed 42), at
+         the aggressive $\rho=0.3$ and balanced $\rho=0.6$ sparse budgets against full-patch
+         training. Validation accuracy is reported for both datasets, as it is the per-epoch metric
+         tracked during training; the test-set accuracy used elsewhere for UrbanStreetTree appears
+         in Tables~\ref{tab:pareto} and \ref{tab:inference_efficiency}. Time-to-target is the time
+         required to reach 95\% of the full-patch best validation accuracy; the FruitsPark
+         $\rho=0.3$ setting does not reach this target ($-$).}
+\label{tab:learning_efficiency}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+Dataset & Bag ratio & Best val acc (\%) & Total time (min) & Total patches (M) & Time to target (min) & Efficiency interpretation \\
+\midrule
+FruitsPark & 0.3 & 89.05 & 26.7 & 0.70 & $-$ & $-$4.76 pp, $-$51.1\% time, $-$69.7\% patches \\
+FruitsPark & 0.6 & 93.33 & 36.5 & 1.39 & 18.6 & $-$0.48 pp, $-$33.3\% time, $-$39.4\% patches \\
+FruitsPark & 1.0 & 93.81 & 54.6 & 2.30 & 17.4 & Full-patch reference \\
+UrbanStreetTree & 0.3 & 99.33 & 164.8 & 8.78 & 18.0 & $+$2.01 pp, $-$61.2\% time, $-$69.9\% patches \\
+UrbanStreetTree & 0.6 & 99.33 & 279.6 & 17.50 & 28.0 & $+$2.01 pp, $-$34.1\% time, $-$40.0\% patches \\
+UrbanStreetTree & 1.0 & 97.32 & 424.4 & 29.19 & 43.0 & Full-patch reference \\
+\bottomrule
+\end{tabular}}
+\vspace{8pt}
+\includegraphics[width=\textwidth]{figures/fig21_learning_efficiency_main.png}
+\captionof{figure}{Learning-efficiency curves for ViT TBS sparse MIL with DepthAug (sampling seed 42),
+         comparing the aggressive ($\rho=0.3$) and balanced ($\rho=0.6$) sparse budgets with
+         full-patch training ($\rho=1.0$). Wall-clock time and estimated processed patches provide
+         more direct efficiency comparisons than epoch count alone because sparse bags process fewer
+         instances per epoch.}
+\label{fig:learning_efficiency}
+\end{figure*}
+
+\subsection{Inference-Time and GPU Memory Efficiency}
+\label{sec:inference_efficiency_results}
+\begin{figure*}[!t]
+\centering
+\captionof{table}{End-to-end inference-efficiency comparison for ViT (sampling seed 42; latency over 50 images
+         after warm-up) at the balanced $\rho=0.6$ and aggressive $\rho=0.3$ budgets. The $\rho=0.3$
+         and $\rho=0.6$ latencies are from separate timing sessions on the same hardware; speedups
+         use the $\rho=0.6$-session full-patch latency as the common reference. Accuracy is final
+         validation accuracy for FruitsPark and final test accuracy for UrbanStreetTree.}
+\label{tab:inference_efficiency}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llccccc}
+\toprule
+Dataset & Method & Bag ratio & Final acc (\%) & Latency / image (ms) & Speedup & Peak GPU mem (MB) \\
+\midrule
+FruitsPark & Full Patch & 1.0 & 93.81 & $115.97\pm2.34$ & 1.00$\times$ & 224.7 \\
+FruitsPark & Proposed Sparse & 0.6 & 93.33 & $82.46\pm3.79$ & 1.41$\times$ & 199.6 \\
+FruitsPark & Proposed Sparse & 0.3 & 90.00 & $65.70\pm0.88$ & 1.77$\times$ & 183.2 \\
+UrbanStreetTree & Full Patch & 1.0 & 93.71 & $588.52\pm92.89$ & 1.00$\times$ & 542.0 \\
+UrbanStreetTree & Proposed Sparse & 0.6 & 97.90 & $466.89\pm69.08$ & 1.26$\times$ & 390.8 \\
+UrbanStreetTree & Proposed Sparse & 0.3 & 96.50 & $370.31\pm57.34$ & 1.59$\times$ & 279.6 \\
+\bottomrule
+\end{tabular}}
+\vspace{8pt}
+\includegraphics[width=\textwidth]{figures/fig22_inference_latency_breakdown.png}
+\captionof{figure}{Inference latency breakdown for full patch and proposed sparse selection at $\rho=0.6$ and
+         $\rho=0.3$. Sparse patch usage reduces model-forward time, but the overall speedup is
+         partly limited by patch preparation and structurally biased selection overhead.}
+\label{fig:inference_breakdown}
+\end{figure*}
+
+Finally, Table~\ref{tab:inference_efficiency} reports end-to-end inference timing for the ViT sparse MIL
+family. The benchmark includes patch generation and selection, GPU transfer, feature extraction, and
+MIL aggregation, so it is a deployment-oriented measurement rather than a backbone-only timing
+proxy. Accuracy is a fixed sampling-seed (42) point estimate, while latency and peak memory are
+measured over 50 images after warm-up.
+
+Compared with full-patch inference, the balanced $\rho=0.6$ setting reduces FruitsPark latency from
+$115.97\pm2.34$ ms/image to $82.46\pm3.79$ ms/image (a 1.41$\times$ speedup, 28.9\% reduction) and
+peak GPU memory by 11.2\% (224.7 to 199.6 MB), with accuracy essentially unchanged (a
+0.48-percentage-point decrease); the aggressive $\rho=0.3$ setting reduces latency to $65.70\pm0.88$
+ms/image (1.77$\times$, 43.3\%) and memory by 18.5\% (to 183.2 MB), at a 3.81-percentage-point
+accuracy cost. On UrbanStreetTree the savings are larger and accuracy improves in both cases:
+$\rho=0.6$ cuts latency from $588.52\pm92.89$ ms/image to $466.89\pm69.08$ ms/image (1.26$\times$,
+20.7\%) and memory by 27.9\% (542.0 to 390.8 MB) while improving accuracy by 4.19 percentage points,
+and $\rho=0.3$ cuts latency to $370.31\pm57.34$ ms/image (1.59$\times$, 37.1\%) and memory by 48.4\%
+(to 279.6 MB) while still improving accuracy by 2.79 percentage points.
+
+Fig.~\ref{fig:inference_breakdown} explains why the realized speedup is smaller than the patch-count
+reduction. Sparse inference substantially reduces the model-forward component, from 20.7 ms at full
+patch to 13.0 ms at $\rho=0.6$ and 9.2 ms at $\rho=0.3$ on FruitsPark, and from 99.2 ms to 63.0 ms
+and 33.6 ms on UrbanStreetTree. However, patch preparation and TBS selection remain the dominant
+cost, especially on UrbanStreetTree. Random sparse sampling is faster because it avoids the
+tree-focused selection cost, but it is used here only as an overhead diagnostic; the main comparison
+is between full-patch inference and the proposed structurally biased sparse inference.
+
+\FloatBarrier
+\onecolumn
+\twocolumn
 \section{Discussion}
 \label{sec:discussion}
 
