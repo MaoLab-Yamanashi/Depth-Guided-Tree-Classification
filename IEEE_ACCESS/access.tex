@@ -569,7 +569,7 @@ ablation.
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.82\textwidth]{figures/fig_dataset_smallcnn_mask_ablation.png}
+\includegraphics[width=0.76\textwidth]{figures/fig_dataset_smallcnn_mask_ablation.png}
 \caption{UrbanStreetTree SmallCNN mask ablation. Background-only images are produced by replacing
          the VOC tree mask with a neutral gray region, while tree-only images replace the
          background. The background-only condition remains far above chance, indicating that scene
@@ -1003,12 +1003,11 @@ but below plain TBS sparse in both localization lift and accuracy, consistent wi
 Table~\ref{tab:sampling_seed_ablation}.
 
 Fig.~\ref{fig:attention_localization_summary} shows the same four quantities after averaging each
-image across the replicated runs, and
-Figs.~\ref{fig:attention_localization_qualitative}--\ref{fig:attention_localization_qualitative_b}
-show one representative test image per class (two-page layout, species 1--7 and 8--13), selected as
-a correctly classified example closest to the class median foreground ratio to avoid showing only
-visually convenient cases, together with the tree mask and the ABMIL attention heatmap under each
-condition.
+image across the replicated runs. For page-scale legibility,
+Fig.~\ref{fig:attention_localization_qualitative} retains five classes from the same
+class-wise representative set: Flowering cherry, Ginkgo, Lagerstroemia, Prunus, and Platanus. Within
+each retained class, the test image is a correctly classified example closest to the class median
+foreground ratio, shown with the tree mask and the ABMIL attention heatmap under each condition.
 
 \begin{figure*}[!tbp]
 \centering
@@ -1042,22 +1041,13 @@ TBS sparse + DepthAug & $0.098\pm0.090$ & $0.138\pm0.099$ & $0.041\pm0.044$ & 1.
 
 \begin{figure*}[p]
 \centering
-\includegraphics[width=\textwidth,height=0.92\textheight,keepaspectratio]{figures/fig26_attention_localization_qualitative.png}
-\caption{Representative ABMIL attention heatmaps per UrbanStreetTree class, Part~1 of~2 (species
-         1--7). Each row shows one correctly classified test image selected closest to the class
-         median foreground ratio. Columns: input image with tree
-         mask, attention heatmap under random sparse, TBS sparse, and TBS sparse with DepthAug
-         selection.}
+\includegraphics[width=\textwidth,height=0.88\textheight,keepaspectratio]{figures/fig26_attention_localization_top5.png}
+\caption{Representative ABMIL attention heatmaps for five UrbanStreetTree classes:
+         Flowering cherry, Ginkgo, Lagerstroemia, Prunus, and Platanus. Each row shows one correctly
+         classified test image selected closest to the class median foreground ratio. Columns show
+         the input image with tree mask and the attention heatmaps under random sparse, TBS sparse,
+         and TBS sparse with DepthAug selection.}
 \label{fig:attention_localization_qualitative}
-\end{figure*}
-
-\begin{figure*}[p]
-\centering
-\includegraphics[width=\textwidth,height=0.92\textheight,keepaspectratio]{figures/fig26b_attention_localization_qualitative.png}
-\caption{Representative ABMIL attention heatmaps per UrbanStreetTree class, Part~2 of~2 (species
-         8--13), continued from Fig.~\ref{fig:attention_localization_qualitative}. Layout and
-         selection criteria are identical to Part~1.}
-\label{fig:attention_localization_qualitative_b}
 \end{figure*}
 
 \subsection{Accuracy--Computation Pareto Efficiency}
