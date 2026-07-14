@@ -155,7 +155,7 @@ abline(h = 1, lty = 2, col = "#111827")
 grid(nx = NA, ny = NULL, col = "#e5e7eb")
 
 mtext(
-  "Attention localization on tree-mask regions (UrbanStreetTree, four-seed average, n = 143 images)",
+  "Attention localization on tree-mask regions (UrbanStreetTree, n = 143 images)",
   outer = TRUE, cex = 1.0, font = 2
 )
 dev.off()

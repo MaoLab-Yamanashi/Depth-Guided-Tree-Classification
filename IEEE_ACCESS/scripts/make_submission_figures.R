@@ -166,7 +166,7 @@ make_sampling_seed_comparison <- function() {
            code = 3, length = 0.05, lwd = 1.35, col = "#111827")
     text(bp, pmin(vals + errs + 3.8, 98.5), sprintf("%.1f", vals), cex = 1.33)
   }
-  mtext("Multiseed comparison by dataset", outer = TRUE, line = 0.4,
+  mtext("Replicated sparse-selection comparison by dataset", outer = TRUE, line = 0.4,
         cex = 1.71, font = 2)
   dev.off()
 }
@@ -295,7 +295,7 @@ make_pareto <- function() {
            lty = c(1, 2, NA), lwd = c(2.4, 2.4, NA), pch = c(16, 15, 21),
            pt.bg = c(NA, NA, "white"))
   }
-  mtext("Patch-budget Pareto frontier at seed 42", outer = TRUE, cex = 1.22, font = 2)
+  mtext("Patch-budget Pareto frontier", outer = TRUE, cex = 1.22, font = 2)
   dev.off()
 }
 
@@ -344,7 +344,7 @@ make_learning_efficiency_local <- function() {
            lty = c(ltys[["0.3"]], ltys[["1.0"]]), lwd = 2,
            pch = c(pchs[["0.3"]], pchs[["1.0"]]))
   }
-  mtext("Learning efficiency: TBS sparse MIL (4-seed mean, DINOv2 backbone)", outer = TRUE, cex = 1.1, font = 2)
+  mtext("Learning efficiency: TBS sparse MIL (DINOv2 backbone)", outer = TRUE, cex = 1.1, font = 2)
   dev.off()
 }
 
@@ -394,7 +394,7 @@ make_attention_localization <- function() {
        line = 0.7, cex.axis = 1.05)
   abline(h = 1, lty = 2, col = "#111827")
 
-  mtext("Attention localization on tree-mask regions (UrbanStreetTree, four-seed average, n = 143 images)", outer = TRUE, cex = 1.30, font = 2)
+  mtext("Attention localization on tree-mask regions (UrbanStreetTree, n = 143 images)", outer = TRUE, cex = 1.30, font = 2)
   dev.off()
 }
 
